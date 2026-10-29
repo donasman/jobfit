@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import date
 
 from jobfit.numbers import NumToken, extract, same_value
 from jobfit.style import MIN_SAMPLES_FOR_LINT, SPECIAL_CHARS, split_sentences
@@ -116,6 +117,8 @@ def lint_answer(
 
     # 연도 — 경험 기간·facts에 있는 연도면 통과
     known_years = {int(y) for p in (periods or []) for y in _YEAR.findall(str(p))} | {int(y) for f in facts for y in _YEAR.findall(f)}
+    if known_years and any("현재" in str(p) for p in (periods or [])):
+        known_years.add(date.today().year)  # '2024-09 ~ 현재'는 올해까지
     if known_years:
         lo, hi = min(known_years), max(known_years)
         for y in sorted(set(found.years)):

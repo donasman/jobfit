@@ -71,3 +71,16 @@ def test_numbers_from_unverified_cards_warn():
 
 def test_empty_answer():
     assert kinds(lint_answer("q1", "   ", 500, True, FACTS), "오류") == ["empty"]
+
+
+def test_period_until_now_covers_this_year():
+    from datetime import date
+
+    from jobfit.lint import lint_answer
+
+    this_year = date.today().year
+    body = f"{this_year}년에도 이 일을 하고 있습니다."
+    ongoing = lint_answer("q1", body, None, True, ["2024년 시작"], "문항", periods=["2024-09 ~ 현재"])
+    ended = lint_answer("q1", body, None, True, ["2024년 시작"], "문항", periods=["2024-09 ~ 2024-12"])
+    assert not [i for i in ongoing.issues if i.kind == "year"]
+    assert [i for i in ended.issues if i.kind == "year"] or this_year == 2024

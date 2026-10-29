@@ -98,3 +98,10 @@ def test_unverified_cards_are_one_line(tmp_path, capsys):
     assert "verified가 true가 아닙니다" not in out  # 카드마다 반복하지 않는다
     assert "[확인 전] 카드 7개" in out and "exp-0, exp-1, exp-2, exp-3, exp-4 외 2개" in out
     assert "카드 7개 · 오류 0 · 경고 0 · 확인 전 7" in out
+
+
+def test_period_formats():
+    ok = ("2025-03 ~ 2025-06", "2025.03", "2026 ~ 현재", "2024.09 – 2025.08", "2024-09 - 2025-08", "2025-07", "2026-08 ~ 현재")
+    for period in ok:
+        assert not [i for i in check_cards([{**GOOD, "period": period}], KD) if "period" in i.message], period
+    assert [i for i in check_cards([{**GOOD, "period": "작년 봄"}], KD) if "period" in i.message]

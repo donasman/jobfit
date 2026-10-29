@@ -27,7 +27,9 @@ _TYPE_ALIASES = {
 SUMMARY_MAX = 60
 _REQUIRED = ("id", "title", "tags", "summary", "usable_for")
 _STAR_KEYS = ("situation", "task", "action", "result")
-_PERIOD = re.compile(r"^\d{4}[-.]\d{1,2}(\s*~\s*(\d{4}[-.]\d{1,2}|현재)?)?$")
+# 기간: 2025-03 ~ 2025-06 · 2025.03 · 2026 ~ 현재(자료에 월이 없을 때) · 2024.09 – 2025.08
+_PERIOD_PART = r"\d{4}(?:[-.]\d{1,2})?"
+_PERIOD = re.compile(rf"^{_PERIOD_PART}(?:\s*(?:~|–|—|\s-\s)\s*(?:{_PERIOD_PART}|현재)?)?$")
 
 CARD_TEMPLATE = """
 - id: {id}          # 영문·숫자·하이픈. 카드마다 다르게
