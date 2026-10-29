@@ -12,14 +12,13 @@ from pathlib import Path
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING
 from jobfit.drafts import load_drafts, load_lint
-from jobfit.emphasis import build_emphasis, load_resume
+from jobfit.emphasis import build_emphasis, example_note, load_resume, split_examples
 from jobfit.experiences import check_cards, example_ids, load_cards
-from jobfit.match import load_analysis, load_match
+from jobfit.match import cards_in_use, load_analysis, load_match
 from jobfit.paths import Project
 from jobfit.state import Job
 
 FILE_REPORT = "report.md"
-TOP_FOR_NOTES = 3  # 확인 필요에 verified 여부를 알릴 상위 카드 수
 
 
 def write_report(project: Project, job: Job, today: date | None = None) -> Path:
@@ -34,7 +33,8 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     analysis = load_analysis(project, job)
     match = load_match(project, job)
     cards, card_problems = load_cards(project.experiences_file)
-    resume_items, resume_problems = load_resume(project.resume_file)
+    all_resume, resume_problems = load_resume(project.resume_file)
+    resume_items, resume_examples = split_examples(all_resume, project.me_example_dir / "resume.yaml")
     meta = _load_json(project.job_dir(job.key) / FILE_CLEAN_META)
     posting_text = _read(project.job_dir(job.key) / FILE_FULL) or _read(project.job_dir(job.key) / FILE_POSTING)
     emphasis = build_emphasis(match, cards, resume_items, kd, posting_text)
@@ -77,9 +77,14 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
             f"필수 {b['must']['covered']}/{b['must']['judged']} · 우대 {b['nice']['covered']}/{b['nice']['judged']}"
             f" · 키워드 {b['keywords']['covered']}/{b['keywords']['judged']}"
         )
-        skipped = (b["must"]["total"] - b["must"]["judged"]) + (b["nice"]["total"] - b["nice"]["judged"])
-        if skipped:
-            out.append(f"(필수·우대 중 {skipped}개는 기술 낱말이 없어 태그로 판단하지 않았습니다)")
+        # 기술 낱말이 없는 조건(경력 연수·자격증 등)은 점수에 못 넣는다 — 몇 개가 아니라 무엇인지 보여 줘야 사람이 판단한다
+        unjudged = [r for r in match.get("requirements", []) if not r.get("terms")]
+        if unjudged:
+            out.append("\n**점수에 넣지 않은 조건** — 기술 낱말이 없어 경험 카드로 판단할 수 없습니다. 직접 판단하세요")
+            for kind, label in (("must", "필수"), ("nice", "우대")):
+                items = [r["text"] for r in unjudged if r["kind"] == kind]
+                if items:
+                    out.append(f"- {label}: " + " · ".join(items))
         out.append("\n| 경험 카드 | 점수 | 맞은 필수 | 맞은 우대 | 맞은 키워드 |")
         out.append("|---|---|---|---|---|")
         for c in match["cards"]:
@@ -102,7 +107,7 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     # 이력서 강조 포인트
     out.append("\n## 이력서 강조 포인트")
     if emphasis["top"]:
-        label = "위로 올릴 항목 (resume.yaml)" if emphasis["source"] == "resume" else "앞세울 경험 (resume.yaml이 없어 경험 카드 순위로)"
+        label = "위로 올릴 항목 (resume.yaml)" if emphasis["source"] == "resume" else "앞세울 경험 (내 이력서 항목이 없어 경험 카드 순위로)"
         out.append(f"\n**{label}**")
         for i, t in enumerate(emphasis["top"], start=1):
             why = "; ".join(x for x in (
@@ -153,7 +158,7 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
 
     # 확인 필요
     notes = []
-    used = {c["id"] for q in questions for c in q.get("cards", [])} | {c["id"] for c in match.get("cards", [])[:TOP_FOR_NOTES]}
+    used = set(cards_in_use(match))
     for c in match.get("cards", []):
         if c["id"] in used and not c["verified"]:
             notes.append(f"경험 카드 '{titles[c['id']]}'은(는) verified가 true가 아닙니다 — 사실을 확인한 뒤 true로 바꾸세요")
@@ -174,6 +179,8 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
             notes.append(f"초안의 [확인 필요] {confirm}곳 — 사실을 채우거나 문장을 빼세요")
         notes.append("초안은 그대로 내지 말고 내 말투로 다시 다듬으세요")
     notes.extend(resume_problems)
+    if example_note(all_resume, resume_examples):
+        notes.append(example_note(all_resume, resume_examples))
     if notes:
         out.append("\n## 확인 필요")
         out.extend(f"- {n}" for n in notes)

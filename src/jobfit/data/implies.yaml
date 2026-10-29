@@ -1,0 +1,52 @@
+# 이 기술을 썼으면 저 기술도 쓴 것으로 본다 — 경험 카드를 공고에 매칭할 때만 쓴다.
+# 예: 카드 태그가 Spring Boot뿐이어도 공고의 'Java' 요건에 맞는 카드로 센다(반대 방향은 아니다).
+# 끝까지 따라간다: Next.js → React → JavaScript. 양쪽 모두 keywords.txt·synonyms.yaml 의 대표 표기로 쓴다.
+
+Spring: [Java]
+Spring Boot: [Spring]
+Spring Batch: [Spring]
+Spring Security: [Spring]
+JPA: [Java]
+Hibernate: [JPA]
+QueryDSL: [JPA]
+MyBatis: [Java]
+
+Django: [Python]
+FastAPI: [Python]
+Flask: [Python]
+
+Node.js: [JavaScript]
+Express: [Node.js]
+NestJS: [Node.js, TypeScript]
+TypeScript: [JavaScript]
+React: [JavaScript]
+Vue: [JavaScript]
+Svelte: [JavaScript]
+Angular: [TypeScript]
+Next.js: [React]
+React Native: [React]
+
+Flutter: [Dart]
+.NET: [C#]
+Gin: [Go]
+
+PostgreSQL: [SQL, 데이터베이스]
+MySQL: [SQL, 데이터베이스]
+MariaDB: [SQL, 데이터베이스]
+Oracle: [SQL, 데이터베이스]
+MSSQL: [SQL, 데이터베이스]
+MongoDB: [데이터베이스]
+
+GitHub Actions: [CI/CD]
+GitLab CI: [CI/CD]
+Jenkins: [CI/CD]
+ArgoCD: [CI/CD]
+Prometheus: [모니터링]
+Grafana: [모니터링]
+Datadog: [모니터링]
+CloudWatch: [모니터링, AWS]
+SQS: [AWS]
+
+RAG: [LLM]
+LLM: [AI]
+머신러닝: [AI]

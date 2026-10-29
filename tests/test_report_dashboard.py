@@ -7,6 +7,7 @@ from openpyxl import load_workbook
 
 from jobfit import cli
 from jobfit.excel.workbook import SHEET_QUESTIONS
+from jobfit.notices import HEADER
 from jobfit.paths import Project
 from jobfit.report import build_report
 from jobfit.state import State
@@ -52,7 +53,7 @@ items:
 """
 
 
-def _project(tmp_path, cards=CARDS, resume=None) -> Project:
+def _project(tmp_path, cards=CARDS, resume=None, analysis=ANALYSIS) -> Project:
     """사람인 픽스처 + 분석 답까지 넣은 프로젝트. 네트워크·AI 없이."""
     project = Project(tmp_path)
     assert cli.main(["--root", str(tmp_path), "init"]) == 0
@@ -67,7 +68,7 @@ def _project(tmp_path, cards=CARDS, resume=None) -> Project:
     if resume is not None:
         project.resume_file.write_text(resume, encoding="utf-8")
     assert cli.main(["--root", str(tmp_path), "run"]) == 0
-    (project.ai_dir(KEY) / "analyze.response.json").write_text(json.dumps(ANALYSIS, ensure_ascii=False), encoding="utf-8")
+    (project.ai_dir(KEY) / "analyze.response.json").write_text(json.dumps(analysis, ensure_ascii=False), encoding="utf-8")
     assert cli.main(["--root", str(tmp_path), "accept", "analyze", "--job", KEY]) == 0
     assert cli.main(["--root", str(tmp_path), "run"]) == 0
     return project
@@ -98,7 +99,7 @@ def test_report_sections(tmp_path):
         assert heading in text
     assert "부족" not in text and "갭" not in text
     assert "주문 API 개선 \\| 캐시 ⚠" in text  # 표 안의 | 이스케이프, verified false 표시
-    assert "앞세울 경험 (resume.yaml이 없어 경험 카드 순위로)" in text
+    assert "앞세울 경험 (내 이력서 항목이 없어 경험 카드 순위로)" in text
     assert "공고에 자소서 문항이 없습니다" in text
     assert "verified가 true가 아닙니다" in text
 
@@ -140,6 +141,69 @@ def test_changed_cards_trigger_rematch_and_resume_triggers_report(tmp_path, caps
     project.resume_file.write_text(RESUME, encoding="utf-8")
     cli.main(["--root", str(tmp_path), "run"])
     assert "이력서 항목이 바뀌어 report부터 다시" in capsys.readouterr().out
+
+
+def test_matching_rules_change_triggers_rematch(tmp_path, capsys):
+    # 예전 버전이 만든 match.json(규칙 해시 없음)은 올린 뒤 첫 실행에서 다시 매칭한다
+    project = _project(tmp_path)
+    state = State.load(project.state_file)
+    state.get(KEY).steps["match"].pop("rules_sha")
+    state.save(project.state_file)
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "run"])
+    assert "매칭 규칙이(가) 바뀌어 매칭부터 다시" in capsys.readouterr().out
+
+
+def test_report_names_conditions_left_out_of_the_score(tmp_path):
+    # 실측: '경력 3년 이상'이 "1개는 판단하지 않았습니다"에 묻혀 점수만 보였다
+    analysis = {**ANALYSIS, "must": [*ANALYSIS["must"], "경력 3년 이상"], "nice": [*ANALYSIS["nice"], "정보처리기사 자격증"]}
+    project = _project(tmp_path, analysis=analysis)
+    text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "**점수에 넣지 않은 조건** — 기술 낱말이 없어 경험 카드로 판단할 수 없습니다. 직접 판단하세요" in text
+    assert "- 필수: 경력 3년 이상" in text
+    assert "- 우대: 정보처리기사 자격증" in text
+
+
+def test_example_resume_is_not_used_for_emphasis(tmp_path, capsys):
+    shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
+    project = _project(tmp_path)  # init 이 me.example 을 me/ 로 복사 — resume.yaml 은 예시 그대로
+    text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "앞세울 경험 (내 이력서 항목이 없어 경험 카드 순위로)" in text
+    assert "주문 조회 API 응답 시간 개선" not in text
+    assert "me/resume.yaml 이 예시 그대로입니다" in text
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    assert "me/resume.yaml 이 예시 그대로입니다" in capsys.readouterr().out.split(HEADER, 1)[1]
+
+
+def test_example_resume_items_mixed_with_mine_are_dropped(tmp_path):
+    shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
+    example = (tmp_path / "me.example" / "resume.yaml").read_text(encoding="utf-8")
+    project = _project(tmp_path, resume=example.rstrip() + "\n" + RESUME.split("items:", 1)[1])
+    text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "위로 올릴 항목 (resume.yaml)" in text
+    assert "[기술] 언어 — 필수 Python 기반 API 개발" in text
+    assert "주문 조회 API 응답 시간 개선 —" not in text
+    assert "me/resume.yaml 에 예시 항목 3개가 남아 있습니다(주문 조회 API 응답 시간 개선, 백엔드, 신규 팀원 온보딩 문서 정리)" in text
+
+
+AI_CARDS = CARDS.replace("  verified: false\n", "  verified: false\n  source: sources/resume.pdf\n") + "".join(
+    f"- id: extra{i}\n  title: 동아리 활동 {i}\n  tags: [협업]\n  summary: 활동\n  facts: []\n  usable_for: [협업]\n"
+    "  verified: false\n  source: sources/resume.pdf\n"
+    for i in range(3)
+)
+
+
+def test_unverified_notice_points_to_cards_in_use(tmp_path, capsys):
+    # 실측: "AI가 뽑은 카드 31개가 확인 전" 이 매번 나와 31개를 당장 다 확인해야 하는 일로 읽혔다
+    project = _project(tmp_path, cards=AI_CARDS)
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    block = capsys.readouterr().out.split(HEADER, 1)[1]
+    assert "공고 리포트·초안에 쓰이는 경험 카드 1개가 아직 확인 전입니다(api)" in block
+    assert "나머지 3개는 쓰일 때 알려 드립니다" in block
+    text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "'동아리 활동 0'은(는) verified" not in text  # 점수 0 카드는 확인 필요에도 넣지 않는다
 
 
 def test_dashboard_contents(tmp_path):

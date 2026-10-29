@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 from jobfit.clean.keywords import KeywordDict
+from jobfit.emphasis import example_note, load_resume, split_examples
 from jobfit.experiences import check_cards, example_ids, load_cards
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
+from jobfit.match import cards_in_use, load_match
 from jobfit.paths import Project
 from jobfit.state import STATUS_ERROR, State
 
@@ -38,14 +40,29 @@ def collect(project: Project, state: State | None = None) -> list[str]:
             f"me/experiences.yaml 에 예시 카드 {len(examples)}개가 남아 있습니다({_ids(examples)}) — 직접 지우세요. "
             "그대로 두면 가짜 경험과 숫자가 매칭·초안에 쓰입니다"
         )
+    resume, _ = load_resume(project.resume_file)
+    resume_note = example_note(resume, split_examples(resume, project.me_example_dir / "resume.yaml")[1])
+    if resume_note:
+        out.append(resume_note)
 
     files = exp_extract.source_files(project)
     ai_unverified = [str(c.get("id")) for c in cards if c.get("source") and c.get("verified") is not True]
     if ai_unverified:
-        out.append(
-            f"AI가 뽑은 경험 카드 {len(ai_unverified)}개가 아직 확인 전입니다 — me/experiences.yaml 에서 사실을 확인하고 "
-            "verified: true 로 바꾸세요(확인 전 카드의 숫자는 초안에서 [확인 필요]가 됩니다)"
-        )
+        # 31개를 한꺼번에 확인하라고 하면 당장 다 해야 하는 일로 읽힌다 — 리포트·초안에 쓰이는 카드만 짚는다
+        in_use = _in_use(project, state)
+        used = [cid for cid in ai_unverified if cid in in_use]
+        rest = len(ai_unverified) - len(used)
+        if used:
+            out.append(
+                f"공고 리포트·초안에 쓰이는 경험 카드 {len(used)}개가 아직 확인 전입니다({_ids(used)}) — me/experiences.yaml 에서 "
+                "사실을 확인하고 verified: true 로 바꾸세요(확인 전 카드의 숫자는 초안에서 [확인 필요]가 됩니다)"
+                + (f". 나머지 {rest}개는 쓰일 때 알려 드립니다" if rest else "")
+            )
+        elif not in_use:
+            out.append(
+                f"AI가 뽑은 경험 카드 {len(ai_unverified)}개는 아직 확인 전입니다 — 지금 다 확인하지 않아도 됩니다. "
+                "공고 리포트·초안에 쓰일 카드가 생기면 그 카드부터 알려 드립니다"
+            )
     direct_ids = {cid for info in files.values() if info.get("direct") for cid in info.get("cards", [])}
     unchecked = [cid for cid in ai_unverified if cid in direct_ids]
     if unchecked:
@@ -85,6 +102,15 @@ def collect(project: Project, state: State | None = None) -> list[str]:
         errs = state.sheet_errors
         out.append("jobs.xlsx 에서 읽지 못한 곳이 있습니다 — 직접 고쳐 주세요: " + " / ".join(errs[:MAX_LISTED]) + (f" 외 {len(errs) - MAX_LISTED}건" if len(errs) > MAX_LISTED else ""))
     return out
+
+
+def _in_use(project: Project, state: State | None) -> set[str]:
+    """진행 중인 공고의 리포트·초안에 쓰이는 카드 id. 매칭한 공고가 없으면 빈 집합."""
+    if state is None and project.state_file.exists():
+        state = State.load(project.state_file)
+    if state is None:
+        return set()
+    return {cid for job in state.active_jobs() for cid in cards_in_use(load_match(project, job))}
 
 
 def render(notices: list[str]) -> list[str]:

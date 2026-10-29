@@ -1,6 +1,7 @@
 """매칭(스크립트, AI 없음) — 공고 분석 결과와 경험 카드를 맞춘다. output/<공고>/match.json.
 
 1. 필수(must)·우대(nice) 항목마다 낱말(키워드 사전 + 카드 태그)을 뽑아, 그 낱말을 태그로 가진 카드를 찾는다.
+   카드 태그는 data/implies.yaml 로 넓혀 본다 — Spring Boot 카드는 'Java' 요건에도 맞는다.
    낱말을 하나도 못 뽑은 항목("피드백에 따른 접근 변경" 같은)은 태그로 판단할 수 없어 점수에서 뺀다.
 2. 점수 = 필수 반영률 60% + 우대 25% + 키워드 15%. 분모가 0인 항목의 가중치는 나머지에 나눠 준다.
 3. 문항은 규칙으로 유형을 나누고(지원동기·직무역량·협업·문제해결·성장·기타), 카드 usable_for가 맞는 카드 중
@@ -17,9 +18,9 @@ from pathlib import Path
 
 from jobfit.ai.analyze import FILE_RESULT as FILE_ANALYSIS
 from jobfit.ai.promptfile import sha1
-from jobfit.clean.keywords import KeywordDict
+from jobfit.clean.keywords import KeywordDict, implies_file
 from jobfit.clean.keywords import word_pattern
-from jobfit.experiences import card_tags, card_types, file_sha, is_verified, load_cards
+from jobfit.experiences import card_types, file_sha, is_verified, load_cards, match_tags
 from jobfit.paths import Project
 from jobfit.state import Job, now
 
@@ -27,6 +28,8 @@ FILE_MATCH = "match.json"
 WEIGHTS = {"must": 0.6, "nice": 0.25, "keywords": 0.15}
 CARD_POINTS = {"must": 3, "nice": 2, "keywords": 1}
 ROLE_WORDS = {"백엔드", "프런트엔드", "풀스택", "서버 개발", "데이터 엔지니어"}
+MATCH_RULES = "2"  # 매칭 코드의 규칙을 바꾸면 올린다 — 예전 규칙으로 만든 match.json 을 다시 만들게 (2: implies.yaml)
+TOP_IN_USE = 3  # 리포트에서 앞세우는 상위 카드 수 — 확인 전이면 먼저 확인하라고 알린다
 
 # 앞에서부터 처음 맞는 유형. 지원동기를 먼저 봐야 "지원 동기와 입사 후 목표"가 문제해결로 가지 않는다
 TYPE_RULES: list[tuple[str, re.Pattern[str]]] = [
@@ -80,7 +83,15 @@ def inputs_sha(project: Project, job: Job) -> dict[str, str]:
         "analysis_sha": file_sha(analysis_path),
         "cards_sha": file_sha(project.experiences_file),
         "questions_sha": sha1(json.dumps([[q["text"], q["limit"], q["count_spaces"]] for q in questions], ensure_ascii=False)),
+        "rules_sha": rules_sha(project),
     }
+
+
+def rules_sha(project: Project) -> str:
+    """매칭 규칙과 사전(대표 표기·다른 표기·포함 관계). 사전을 고치거나 버전을 올리면 매칭을 다시 한다."""
+    data = project.data_dir
+    files = [data / "keywords.txt", data / "synonyms.yaml", implies_file(data)]
+    return sha1(MATCH_RULES + "".join(f.read_text(encoding="utf-8") for f in files if f.exists()))
 
 
 def terms_of(text: str, kd: KeywordDict, extra_tags: list[str]) -> list[str]:
@@ -99,8 +110,8 @@ def terms_of(text: str, kd: KeywordDict, extra_tags: list[str]) -> list[str]:
 
 
 def build_match(analysis: dict, cards: list[dict], questions: list[dict], kd: KeywordDict) -> dict:
-    tags_by_card = {str(c.get("id")): {t.lower() for t in card_tags(c, kd)} for c in cards if c.get("id")}
-    all_tags = list(dict.fromkeys(t for c in cards for t in card_tags(c, kd)))
+    tags_by_card = {str(c.get("id")): {t.lower() for t in match_tags(c, kd)} for c in cards if c.get("id")}
+    all_tags = list(dict.fromkeys(t for c in cards for t in match_tags(c, kd)))
 
     requirements = []
     for kind in ("must", "nice"):
@@ -210,6 +221,13 @@ def run_match(project: Project, job: Job, kd: KeywordDict | None = None) -> dict
 
 def load_match(project: Project, job: Job) -> dict:
     return _load(project.job_dir(job.key) / FILE_MATCH)
+
+
+def cards_in_use(match: dict) -> list[str]:
+    """리포트·초안에 실제로 쓰이는 카드 id — 문항에 배정된 카드와 매칭 상위 카드(점수 0은 빼고)."""
+    ids = [c["id"] for q in match.get("questions", []) for c in q.get("cards", [])]
+    ids += [c["id"] for c in match.get("cards", [])[:TOP_IN_USE] if c.get("score", 0) > 0]
+    return list(dict.fromkeys(ids))
 
 
 def _score(breakdown: dict) -> int | None:

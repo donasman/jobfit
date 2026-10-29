@@ -202,7 +202,7 @@ def _stale_reason(project: Project, job: Job) -> str:
         stored = job.steps["match"]
         changed = [k for k, v in inputs_sha(project, job).items() if stored.get(k) != v]
         if changed:
-            names = {"analysis_sha": "공고 분석", "cards_sha": "경험 카드", "questions_sha": "문항"}
+            names = {"analysis_sha": "공고 분석", "cards_sha": "경험 카드", "questions_sha": "문항", "rules_sha": "매칭 규칙"}
             return "·".join(names[k] for k in changed) + "이(가) 바뀌어 매칭부터 다시"
     if job.step_done("report") and job.steps["report"].get("resume_sha") != file_sha(project.resume_file):
         return "이력서 항목이 바뀌어 report부터 다시"

@@ -49,7 +49,7 @@ ETL: [ELT]
 데이터 파이프라인: [데이터파이프라인]
 머신러닝: [ML, 기계학습, Machine Learning]
 MSA: [마이크로서비스, 마이크로 서비스]
-데이터베이스: [DB, 데이터 베이스]
+데이터베이스: [DB, 데이터 베이스, RDBMS]   # 'MSSQL 또는 Oracle 등 RDBMS' — 다른 RDBMS 경험도 맞는 것으로
 배포: [deploy, 디플로이]
 테스트: [testing]
 AI: [인공지능, 생성형 AI]

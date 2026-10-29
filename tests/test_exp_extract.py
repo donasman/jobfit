@@ -348,7 +348,8 @@ def test_user_notices_block_after_extract_next_and_run(tmp_path, capsys):
     # 경고 줄 사이가 아니라, 다 끝났을 때 머리줄과 함께 한 묶음으로
     block = out.split(HEADER, 1)[1]
     assert "예시 카드 2개가 남아 있습니다(exp-order-api-latency, exp-team-onboarding-doc) — 직접 지우세요" in block
-    assert "AI가 뽑은 경험 카드 1개가 아직 확인 전입니다" in block
+    assert "AI가 뽑은 경험 카드 1개는 아직 확인 전입니다 — 지금 다 확인하지 않아도 됩니다" in block  # 쓰이는 공고가 아직 없다
+    assert "me/resume.yaml 이 예시 그대로입니다" in block
     assert "카드 1개의 STAR에 facts에 없는 숫자가 있습니다(exp-batch)" in block
     assert "sources/old.hwp 은(는) 읽지 못해 건너뛰었습니다" in block
     assert "자료 1개에서 카드 1개" in out

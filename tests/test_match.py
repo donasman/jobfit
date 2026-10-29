@@ -1,7 +1,8 @@
 import json
 
 from jobfit.clean.keywords import KeywordDict
-from jobfit.match import assign, build_match, classify_question, resolve_questions
+from jobfit.experiences import match_tags
+from jobfit.match import assign, build_match, cards_in_use, classify_question, resolve_questions, rules_sha
 from jobfit.paths import package_data_dir
 from jobfit.state import Job
 
@@ -15,7 +16,7 @@ ANALYSIS = {
     "questions_found": [{"text": "지원 동기를 적어주세요", "limit": 800}],
 }
 CARDS = [
-    {"id": "etl", "title": "ETL 파이프라인", "tags": ["파이썬", "PostgreSQL", "배치"], "usable_for": ["직무역량", "문제해결"], "verified": True},
+    {"id": "etl", "title": "ETL 파이프라인", "tags": ["파이썬", "Airflow", "배치"], "usable_for": ["직무역량", "문제해결"], "verified": True},
     {"id": "api", "title": "주문 API 개선", "tags": ["Java", "스프링부트", "성능 최적화", "Docker"], "usable_for": ["문제해결"], "verified": False},
     {"id": "doc", "title": "온보딩 문서", "tags": ["협업", "문서화"], "usable_for": ["협업", "성장"], "verified": True},
 ]
@@ -122,3 +123,57 @@ def test_user_edited_assignment_survives_rerun(tmp_path):
     assert again["edited"] is True and again["questions"][0]["cards"][0]["id"] == "doc"
     third = run_match(project, job)  # 한 번 더 돌려도 계속 지킨다
     assert third["edited"] is True and third["questions"][0]["cards"][0]["id"] == "doc"
+
+
+def test_implied_tags_count_for_the_language():
+    # 실측: Spring Boot·MyBatis 카드에 Java 태그가 없어 'Java' 요건에서 빠지고, Java 태그뿐인 알고리즘 스터디가 1위가 됐다
+    cards = [
+        {"id": "study", "title": "알고리즘 스터디", "tags": ["Java"], "usable_for": ["성장"]},
+        {"id": "portal", "title": "공공 포털 유지보수", "tags": ["Spring Boot", "MyBatis", "MySQL"], "usable_for": ["직무역량"]},
+    ]
+    analysis = {"must": ["Java 기반 웹 개발", "SQL 작성"], "nice": ["Spring 프레임워크"], "keywords": ["Java", "Spring"]}
+    m = build_match(analysis, cards, [], KD)
+    req = {r["text"]: r["cards"] for r in m["requirements"]}
+    assert req["Java 기반 웹 개발"] == ["study", "portal"]
+    assert req["SQL 작성"] == ["portal"]  # MySQL을 썼으면 SQL도
+    assert req["Spring 프레임워크"] == ["portal"]  # Spring Boot는 Spring
+    assert m["cards"][0]["id"] == "portal"
+
+
+def test_implication_goes_one_way_and_follows_chains():
+    assert match_tags({"tags": ["스프링부트"]}, KD) == ["Spring Boot", "Spring", "Java"]
+    assert KD.expand(["Next.js"]) == ["Next.js", "React", "JavaScript"]
+    assert KD.expand(["Java"]) == ["Java"]  # Java를 썼다고 Spring을 쓴 건 아니다
+    m = build_match({"must": ["Spring Boot 개발"], "nice": [], "keywords": []}, [{"id": "j", "tags": ["Java"]}], [], KD)
+    assert m["requirements"][0]["cards"] == []
+
+
+def test_rules_sha_follows_dictionary_files(tmp_path):
+    import shutil
+
+    from jobfit.paths import Project
+
+    project = Project(tmp_path)
+    before = rules_sha(project)
+    (tmp_path / "data").mkdir()
+    for name in ("keywords.txt", "synonyms.yaml"):
+        shutil.copy(package_data_dir() / name, tmp_path / "data" / name)
+    assert rules_sha(project) == before  # 사전만 복사해 둔 data/ 에는 패키지 implies.yaml 을 쓴다
+    (tmp_path / "data" / "implies.yaml").write_text("Spring: [Java]\n", encoding="utf-8")
+    assert rules_sha(project) != before
+    after = rules_sha(project)
+    (tmp_path / "data" / "synonyms.yaml").write_text("Java: [자바]\n", encoding="utf-8")
+    assert rules_sha(project) != after  # 다른 표기를 고쳐도 매칭을 다시 한다
+
+
+def test_rdbms_requirement_accepts_other_databases():
+    # 실측: 'MSSQL 또는 Oracle 등 RDBMS 활용'에 PostgreSQL·MySQL 카드가 하나도 맞지 않았다
+    m = build_match({"must": ["MSSQL 또는 Oracle 등 RDBMS 활용"], "nice": [], "keywords": []}, [{"id": "pg", "tags": ["PostgreSQL"]}], [], KD)
+    assert m["requirements"][0]["cards"] == ["pg"]
+
+
+def test_cards_in_use_are_assigned_or_top_scoring():
+    m = build_match(ANALYSIS, CARDS, [], KD)
+    assert cards_in_use(m) == ["api", "etl"]  # doc는 점수 0 — 상위 3개 안이어도 쓰이지 않는다
+    m["questions"] = assign([_q("동료와 협업한 경험")], m["cards"])
+    assert cards_in_use(m) == ["doc", "api", "etl"]

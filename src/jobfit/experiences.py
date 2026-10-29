@@ -103,6 +103,11 @@ def card_tags(card: dict, kd: KeywordDict) -> list[str]:
     return list(dict.fromkeys(kd.normalize(str(t).strip()) for t in tags if str(t).strip()))
 
 
+def match_tags(card: dict, kd: KeywordDict) -> list[str]:
+    """매칭에 쓰는 태그 — 카드 태그에 data/implies.yaml 의 포함 관계를 더한다(Spring Boot → Spring → Java)."""
+    return kd.expand(card_tags(card, kd))
+
+
 def normalize_type(value) -> str | None:
     s = re.sub(r"\s+", "", str(value))
     if s in QUESTION_TYPES:

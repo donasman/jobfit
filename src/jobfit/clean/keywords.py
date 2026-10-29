@@ -1,4 +1,5 @@
 """키워드 사전 매칭 — data/keywords.txt, data/synonyms.yaml 기준으로 공고 글자에서 기술·직무 낱말을 찾는다.
+data/implies.yaml 은 포함 관계(Spring → Java)로, 경험 카드 태그를 매칭할 때 넓히는 데만 쓴다.
 
 canonical(대표 표기) 하나에 여러 표기(동의어)가 붙는다. 결과는 대표 표기로 정규화한다.
 영문 토큰은 단어 경계로, 한글 토큰은 부분 문자열로 찾는다. 긴 표기를 먼저 찾고 그 자리를 가린다.
@@ -17,12 +18,13 @@ import yaml
 class KeywordDict:
     canonical: list[str] = field(default_factory=list)
     variants: dict[str, list[str]] = field(default_factory=dict)  # canonical -> 표기들(대표 포함)
+    implies: dict[str, list[str]] = field(default_factory=dict)  # 대표 표기 -> 그걸 썼으면 함께 쓴 것(Spring -> Java)
     _ordered: list[tuple[str, str]] | None = field(default=None, repr=False, compare=False)  # (표기, 대표) 긴 것부터
 
     @classmethod
     def load(cls, data_dir: Path) -> "KeywordDict":
         """같은 폴더·같은 파일 수정 시각이면 한 번 읽은 사전을 다시 쓴다."""
-        files = [data_dir / "keywords.txt", data_dir / "synonyms.yaml"]
+        files = [data_dir / "keywords.txt", data_dir / "synonyms.yaml", implies_file(data_dir)]
         stamp = (str(data_dir.resolve()), *(f.stat().st_mtime_ns if f.exists() else 0 for f in files))
         if stamp not in _load_cache:
             _load_cache[stamp] = cls._read(data_dir)
@@ -48,7 +50,26 @@ class KeywordDict:
                     kd.canonical.append(str(canon))
         for c in kd.canonical:
             kd.variants[c] = [c, *synonyms.get(c, [])]
+        imp_file = implies_file(data_dir)
+        if imp_file.exists():
+            loaded = yaml.safe_load(imp_file.read_text(encoding="utf-8")) or {}
+            for tech, implied in loaded.items():
+                implied = implied if isinstance(implied, list) else [implied]
+                kd.implies[kd.normalize(str(tech))] = [kd.normalize(str(t)) for t in implied if t]
         return kd
+
+    def expand(self, tags: list[str]) -> list[str]:
+        """태그에 implies 를 끝까지 따라가 더한다. 원래 태그가 앞, 더한 것은 뒤."""
+        out = list(dict.fromkeys(tags))
+        seen = {t.lower() for t in out}
+        i = 0
+        while i < len(out):
+            for t in self.implies.get(out[i], []):
+                if t.lower() not in seen:
+                    seen.add(t.lower())
+                    out.append(t)
+            i += 1
+        return out
 
     def normalize(self, token: str) -> str:
         """어떤 표기든 대표 표기로. 사전에 없으면 그대로."""
@@ -96,6 +117,12 @@ class KeywordDict:
 
 _pattern_cache: dict[str, re.Pattern[str]] = {}
 _load_cache: dict[tuple, KeywordDict] = {}
+
+
+def implies_file(data_dir: Path) -> Path:
+    """프로젝트 data/ 에 implies.yaml 이 없으면 패키지 것을 쓴다 — 예전에 사전만 복사해 둔 data/ 에도 포함 관계가 적용되게."""
+    local = data_dir / "implies.yaml"
+    return local if local.exists() else Path(__file__).resolve().parent.parent / "data" / "implies.yaml"
 
 
 def word_pattern(token: str) -> re.Pattern[str]:

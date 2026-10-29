@@ -30,6 +30,25 @@ def load_resume(path: Path) -> tuple[list[dict], list[str]]:
     return [i for i in items if isinstance(i, dict) and (i.get("title") or i.get("text"))], []
 
 
+def split_examples(items: list[dict], example_file: Path) -> tuple[list[dict], list[str]]:
+    """(내 항목, me.example 에서 그대로 복사된 예시 항목의 제목). 제목과 내용이 둘 다 같아야 예시로 본다(고쳐 쓴 항목은 내 항목).
+    예시 항목은 강조 포인트에 쓰지 않는다 — 가짜 이력서 항목을 '위로 올릴 것'으로 내놓지 않게."""
+    examples, _ = load_resume(example_file)
+    pairs = {_pair(i) for i in examples}
+    mine = [i for i in items if _pair(i) not in pairs]
+    return mine, [str(i.get("title") or i.get("text", ""))[:40] for i in items if _pair(i) in pairs]
+
+
+def example_note(items: list[dict], example_titles: list[str]) -> str:
+    """예시 항목이 남았을 때 사용자에게 알릴 한 줄. 없으면 빈 문자열."""
+    if not example_titles:
+        return ""
+    if len(example_titles) == len(items):
+        return "me/resume.yaml 이 예시 그대로입니다 — 강조 포인트는 경험 카드 순위로 대신합니다. 내 이력서 항목으로 바꾸거나 파일을 지우세요"
+    shown = ", ".join(example_titles[:5]) + (f" 외 {len(example_titles) - 5}개" if len(example_titles) > 5 else "")
+    return f"me/resume.yaml 에 예시 항목 {len(example_titles)}개가 남아 있습니다({shown}) — 강조 포인트에서 뺐습니다. 직접 지우세요"
+
+
 def build_emphasis(match: dict, cards: list[dict], resume_items: list[dict], kd: KeywordDict, posting_text: str) -> dict:
     requirements = match.get("requirements", [])
     all_terms = list(dict.fromkeys(list(match.get("keywords", [])) + [k for r in requirements for k in r.get("terms", [])]))
@@ -38,7 +57,7 @@ def build_emphasis(match: dict, cards: list[dict], resume_items: list[dict], kd:
         source = "resume"
         scored = []
         for item in resume_items:
-            tags = [kd.normalize(str(t)) for t in (item.get("tags") or [])]
+            tags = kd.expand([kd.normalize(str(t)) for t in (item.get("tags") or [])])
             blob = _blob(item.get("title"), item.get("text"), " ".join(tags))
             terms = {t.lower() for t in terms_of(blob, kd, tags)} | {t.lower() for t in tags}
             hits = _hits(requirements, match, terms)
@@ -84,6 +103,10 @@ def _hits(requirements: list[dict], match: dict, terms: set[str]) -> dict[str, l
         "nice": [r["text"] for r in requirements if r["kind"] == "nice" and {t.lower() for t in r["terms"]} & terms],
         "keywords": [k for k in match.get("keywords", []) if k.lower() in terms],
     }
+
+
+def _pair(item: dict) -> tuple[str, str]:
+    return str(item.get("title") or "").strip(), str(item.get("text") or "").strip()
 
 
 def _blob(*parts) -> str:
