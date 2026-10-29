@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# jobfit — 사용자 데이터·결과·상태. 배포본에 들어가지 않는다
+me/
+output/
+.jobfit/
+jobs.xlsx
+dashboard.xlsx
+~$*.xlsx
+.env
+.uv-cache/
+
+# 실제 채용 사이트 페이지로 하는 회귀 테스트 — 사이트 저작물·담당자 정보가 들어 있어 배포하지 않는다
+tests/fixtures_live/
+dist/

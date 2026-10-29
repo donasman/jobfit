@@ -1,0 +1,5 @@
+# 배치 파일은 CRLF가 아니면 goto·레이블이 깨질 수 있다
+*.bat text eol=crlf
+*.sh text eol=lf
+# 픽스처는 받은 그대로 비교한다
+tests/fixtures/** -text

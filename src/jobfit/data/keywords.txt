@@ -1,0 +1,137 @@
+# 기술·직무 키워드 사전. 한 줄에 대표 표기 하나. 다른 표기는 synonyms.yaml에.
+# 프로젝트 루트에 data/ 폴더를 두면 이 파일 대신 그쪽을 쓴다.
+
+# 언어
+Java
+Kotlin
+Python
+JavaScript
+TypeScript
+Go
+C
+C++
+C#
+Rust
+Scala
+PHP
+Ruby
+Swift
+Dart
+SQL
+
+# 백엔드 프레임워크·런타임
+Spring
+Spring Boot
+Spring Batch
+Spring Security
+JPA
+Hibernate
+MyBatis
+QueryDSL
+Node.js
+Express
+NestJS
+Django
+FastAPI
+Flask
+.NET
+Gin
+gRPC
+GraphQL
+REST API
+WebSocket
+
+# 프런트엔드·모바일
+React
+Vue
+Next.js
+Angular
+Svelte
+Flutter
+React Native
+Android
+iOS
+
+# 데이터베이스·캐시·메시지
+PostgreSQL
+MySQL
+MariaDB
+Oracle
+MSSQL
+MongoDB
+Redis
+Elasticsearch
+Kafka
+RabbitMQ
+SQS
+
+# 인프라·운영
+AWS
+GCP
+Azure
+Docker
+Kubernetes
+Terraform
+Linux
+Nginx
+Jenkins
+GitHub Actions
+GitLab CI
+ArgoCD
+CI/CD
+Prometheus
+Grafana
+ELK
+Datadog
+CloudWatch
+
+# 데이터·AI
+Airflow
+Spark
+Hadoop
+ETL
+데이터 파이프라인
+머신러닝
+LLM
+RAG
+
+# 일반 개발 낱말 — 공고 필수·우대 문장에 자주 나와 매칭이 판단할 수 있게 한다
+API
+데이터베이스
+배포
+테스트
+디버깅
+자동화
+AI
+
+# 설계·방법
+MSA
+DDD
+TDD
+클린 아키텍처
+이벤트 드리븐
+대용량 트래픽
+성능 최적화
+동시성
+분산 시스템
+무중단 배포
+모니터링
+테스트 코드
+코드 리뷰
+애자일
+스크럼
+Git
+
+# 직무·역량 낱말
+백엔드
+프런트엔드
+풀스택
+서버 개발
+데이터 엔지니어
+DevOps
+협업
+커뮤니케이션
+문제 해결
+주도적
+빠른 학습
+문서화

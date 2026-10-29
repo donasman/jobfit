@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run jobfit:*)",
+      "PowerShell(uv run jobfit:*)",
+      "Edit(./output/**/_ai/*.response.*)",
+      "Edit(./output/_style/style-rules.response.md)"
+    ],
+    "deny": [
+      "Read(./me/**)",
+      "Read(./.jobfit/**)",
+      "Read(./jobs.xlsx)",
+      "Read(./output/**/posting.txt)",
+      "Read(./output/**/posting.full.txt)",
+      "Read(./output/**/source*.html)",
+      "Read(./output/**/source.pdf)"
+    ]
+  }
+}

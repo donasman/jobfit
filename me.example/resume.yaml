@@ -1,0 +1,19 @@
+# 이력서 항목 (선택) — report.md 의 "이력서 강조 포인트"에 쓰인다.
+# 이 공고의 필수·우대·키워드와 많이 맞는 항목을 "위로 올릴 것"으로, 공고와 다르게 적은 기술 표기를 "맞출 것"으로 알려 준다.
+# 이 파일이 없으면 경험 카드 순위로 대신한다. 연락처·주소 같은 개인정보는 넣지 않는다.
+
+items:
+  - section: 프로젝트          # 경력 · 프로젝트 · 기술 · 교육 · 자격증 등 자유
+    title: 주문 조회 API 응답 시간 개선
+    text: "N+1 조회를 fetch join으로 묶고 상품 정보를 Redis에 캐시해 p95 1.8초 → 0.4초"
+    tags: [Java, 스프링부트, JPA, Redis, 성능 최적화]
+
+  - section: 기술
+    title: 백엔드
+    text: "Java, Spring Boot, JPA, MySQL, Redis, Docker"
+    tags: [Java, Spring Boot, JPA, MySQL, Redis, Docker]
+
+  - section: 활동
+    title: 신규 팀원 온보딩 문서 정리
+    text: "로컬 실행 방법을 한 문서로 모아 세팅 소요를 줄임"
+    tags: [문서화, 협업]
