@@ -172,6 +172,7 @@ def cmd_run(project: Project, args) -> int:
     state.save(project.state_file)
     action = pipeline.next_action(project, state)
     print(f"다음: {action.message}" + (f"  →  {action.command}" if action.command else ""))
+    _print_notices(project, state)
     return 0
 
 
@@ -262,6 +263,8 @@ def cmd_next(project: Project, args) -> int:
     print(action.message)
     if action.command:
         print(action.command)
+    if project.is_initialized():
+        _print_notices(project, state)
     return 0
 
 
@@ -530,8 +533,22 @@ def _accept_exp(project: Project, args) -> int:
     if result.remaining:
         print(f"남은 자료 조각 {result.remaining}개 — 다음: jobfit prep exp-extract --copy (메뉴 3)")
     else:
-        print("자료를 모두 카드로 만들었습니다. 다음: jobfit exp check 로 확인하고, 사실이 맞으면 verified: true 로")
+        files = exp_extract.source_files(project)
+        made = sum(len(i.get("cards", [])) for i in files.values())
+        dropped = sum(int(i.get("dropped", 0)) for i in files.values())
+        done = sum(1 for i in files.values() if i.get("status") == "done")
+        print(f"자료를 모두 카드로 만들었습니다 — 자료 {done}개에서 카드 {made}개" + (f", 원문에 없는 숫자라 뺀 fact {dropped}개" if dropped else ""))
+        print("다음: jobfit exp check 로 확인하고, 사실이 맞으면 verified: true 로")
+        _print_notices(project, State.load(project.state_file) if project.state_file.exists() else None)
     return 0
+
+
+def _print_notices(project: Project, state) -> None:
+    """사람이 해야 할 일 묶음(notices). 에이전트가 요약하다 빠뜨리지 않게 따로 낸다."""
+    from jobfit import notices
+
+    for line in notices.render(notices.collect(project, state)):
+        print(line)
 
 
 def _print_scan(project: Project, report) -> None:
@@ -576,6 +593,7 @@ def _accept_style(project: Project, args) -> int:
     for w in result.warnings:
         print(f"  ! {w}")
     print("읽고 고친 뒤 맨 위 안내 줄을 지우면 확정입니다. 다음 초안부터 반영됩니다")
+    _print_notices(project, None)
     return 0
 
 

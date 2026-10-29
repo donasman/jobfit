@@ -25,7 +25,7 @@ import yaml
 from jobfit.ai.promptfile import LIMITS, TAGS_MAX_CHARS, fit_list, load_template, log_usage, render
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import mask_contacts
-from jobfit.experiences import EXAMPLE_NOTE, FILE_HEADER, card_tags, example_ids, load_cards, normalize_type
+from jobfit.experiences import FILE_HEADER, card_tags, load_cards, normalize_type
 from jobfit.match import ROLE_WORDS
 from jobfit.numbers import extract, same_value
 from jobfit.paths import Project
@@ -36,6 +36,7 @@ STEP = "exp-extract"
 SOURCE_PART = 5000  # 프롬프트 한 장에 넣는 자료 글자수. 넘으면 조각으로 나눈다
 MAX_SOURCE_BYTES = 30_000_000  # 이보다 큰 파일(영상 등)은 읽지 않는다
 BACKUP_KEEP = 10
+DROPPED_MARK = "자료 원문에 없는 숫자가 있어 이 fact를 뺐습니다"
 _FENCE_LINE = re.compile(r"^[ \t]*```[\w-]*[ \t]*$", re.M)
 _FENCED = re.compile(r"^[ \t]*```[\w-]*[ \t]*\n(.*?)^[ \t]*```", re.S | re.M)
 _ID_SAFE = re.compile(r"[^a-z0-9-]+")
@@ -273,14 +274,18 @@ def accept(project: Project, raw: str | None = None, prefer: str | None = None) 
             return Accepted(ok=False, errors=[str(e)], item=item)
     info.setdefault("done_parts", []).append(item.part)
     info.setdefault("cards", []).extend(c["id"] for c in cards)
+    info["dropped"] = int(info.get("dropped", 0)) + sum(1 for w in warnings if DROPPED_MARK in w)
     if len(info["done_parts"]) >= int(info.get("parts", 1)):
         info["status"] = "done"
     info["at"] = now()
     _save_state(project, state)
-    examples = example_ids(existing, project.me_example_dir / "experiences.yaml")
-    if examples:
-        warnings.append(f"예시 카드 {len(examples)}개가 아직 있습니다({', '.join(examples)}) — {EXAMPLE_NOTE.split(' — ', 1)[1]}. me/experiences.yaml 에서 직접 지우세요")
+    # 예시 카드·확인 전 카드 같은 '사람이 할 일'은 조각마다 섞지 않고, 다 끝났을 때와 next·run 끝에 한 묶음으로 낸다(notices)
     return Accepted(ok=True, added=cards, warnings=warnings, item=item, remaining=len(pending_items(project)))
+
+
+def source_files(project: Project) -> dict[str, dict]:
+    """sources/ 자료별 처리 상태(읽기 전용 사본)."""
+    return dict(_load_state(project).get("files", {}))
 
 
 def parse_cards(text: str) -> list:
@@ -343,7 +348,7 @@ def normalize_cards(data: list, existing: list[dict], kd: KeywordDict, source_te
         for fact in _str_list(raw.get("facts")):
             nums = extract(fact).numbers
             if src_numbers is not None and nums and not all(same_value(n, src_numbers) for n in nums):
-                warnings.append(f"{cid}: 자료 원문에 없는 숫자가 있어 이 fact를 뺐습니다 — \"{fact}\"")
+                warnings.append(f"{cid}: {DROPPED_MARK} — \"{fact}\"")
                 continue
             facts.append(fact)
         # star 에만 있고 facts 에 없는 숫자(원문에는 있는 것) — 초안에 쓰면 검사에 걸리니 바로 알린다

@@ -326,17 +326,42 @@ def test_paste_goes_to_the_prompt_shown_last(tmp_path, capsys):
     assert "경험 카드 1개" in capsys.readouterr().out
 
 
-def test_accept_reminds_about_example_cards(tmp_path, capsys):
+def test_user_notices_block_after_extract_next_and_run(tmp_path, capsys):
     import shutil
     from pathlib import Path
+
+    from jobfit.notices import HEADER
 
     shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
     assert cli.main(["--root", str(tmp_path), "init"]) == 0
     project = Project(tmp_path)
     (project.sources_dir / "r.txt").write_text(RESUME, encoding="utf-8")
+    (project.sources_dir / "old.hwp").write_bytes(b"HWP")
     cli.main(["--root", str(tmp_path), "exp", "extract"])
     card = tmp_path / "c.txt"
-    card.write_text('- id: exp-batch\n  title: 결제 알림 배치 개선\n  facts: ["하루 3만 건 알림"]\n', encoding="utf-8")
+    card.write_text(
+        '- id: exp-batch\n  title: 결제 알림 배치 개선\n  star: {action: 하루 3만 건 알림을 옮김}\n  facts: []\n', encoding="utf-8"
+    )
     capsys.readouterr()
     assert cli.main(["--root", str(tmp_path), "accept", "exp-extract", "--file", str(card)]) == 0
-    assert "예시 카드 2개가 아직 있습니다(exp-order-api-latency, exp-team-onboarding-doc)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # 경고 줄 사이가 아니라, 다 끝났을 때 머리줄과 함께 한 묶음으로
+    block = out.split(HEADER, 1)[1]
+    assert "예시 카드 2개가 남아 있습니다(exp-order-api-latency, exp-team-onboarding-doc) — 직접 지우세요" in block
+    assert "AI가 뽑은 경험 카드 1개가 아직 확인 전입니다" in block
+    assert "카드 1개의 STAR에 facts에 없는 숫자가 있습니다(exp-batch)" in block
+    assert "sources/old.hwp 은(는) 읽지 못해 건너뛰었습니다" in block
+    assert "자료 1개에서 카드 1개" in out
+    # 에이전트가 처음 부르는 next·run 에도 같은 묶음이 붙는다
+    for cmd in ("next", "run"):
+        cli.main(["--root", str(tmp_path), cmd])
+        assert HEADER in capsys.readouterr().out, cmd
+
+
+def test_no_notice_block_when_nothing_to_do(tmp_path, capsys):
+    from jobfit.notices import HEADER
+
+    _project(tmp_path)  # 예시 카드 없음, 확인된 카드 하나
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    assert HEADER not in capsys.readouterr().out
