@@ -197,3 +197,20 @@ def test_exp_check_warns_star_numbers_outside_facts(tmp_path, capsys):
     project.experiences_file.write_text(CARDS.replace("응답 시간이 줄고", "응답 시간이 78% 줄고"), encoding="utf-8")
     cli.main(["--root", str(tmp_path), "exp", "check"])
     assert "star에 facts에 없는 숫자가 있습니다: 78%" in capsys.readouterr().out
+
+
+def test_question_block_shrinks_but_keeps_facts():
+    from jobfit.ai.draft import _question_block
+
+    long_star = {k: "가" * 200 for k in ("situation", "task", "action", "result")}
+    cards = {
+        "a": {"id": "a", "title": "주력", "star": long_star, "facts": ["p95 1.8초 → 0.4초"], "verified": True},
+        "b": {"id": "b", "title": "보조", "star": long_star, "facts": ["쿼리 21회 → 1회"], "verified": True},
+    }
+    q = {"id": "q1", "text": "문항", "limit": 500, "count_spaces": True, "type": "직무역량", "cards": [{"id": "a", "role": "주력"}, {"id": "b", "role": "보조"}]}
+    full, one, two = (_question_block(q, cards, level) for level in (0, 1, 2))
+    assert len(full) > len(one) > len(two)
+    assert "가" * 200 in full and "가" * 120 + "…" in one and "가" * 60 + "…" in two
+    assert two.count("가" * 60) == 4  # 보조 카드 STAR는 빠지고 주력 카드 네 칸만
+    for block in (full, one, two):
+        assert '"p95 1.8초 → 0.4초"' in block and '"쿼리 21회 → 1회"' in block  # facts는 끝까지 남는다

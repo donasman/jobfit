@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from jobfit.ai.jsonx import extract_json
-from jobfit.ai.promptfile import LIMITS, load_template, log_usage, render, sha1
+from jobfit.ai.promptfile import LIMITS, TAGS_MAX_CHARS, fit_list, load_template, log_usage, render, sha1
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING, POSTING_LIMIT, mask_contacts
 from jobfit.experiences import load_cards, tag_list
@@ -97,7 +97,10 @@ def build_prompt(project: Project, job: Job) -> str:
     meta = _load_json(job_dir / FILE_CLEAN_META)
     kd = KeywordDict.load(project.data_dir)
     cards, _ = load_cards(project.experiences_file)
-    tags = tag_list(cards, kd)
+    # 경험 태그는 카드가 늘수록 길어진다 — 공고에 나온 태그 먼저, 그다음 많이 쓴 순으로 상한까지
+    in_posting = {canon for canon, _ in kd.scan(posting)}
+    all_tags = tag_list(cards, kd)
+    tags = [t for t in all_tags if t in in_posting] + [t for t in all_tags if t not in in_posting]
     keywords = list(meta.get("keywords", {}))[:_KEYWORDS_IN_PROMPT]
     candidates = [q.get("text", "") for q in meta.get("questions", [])][:_CANDIDATES_IN_PROMPT]
     values = {
@@ -105,7 +108,7 @@ def build_prompt(project: Project, job: Job) -> str:
         "job": job.key,
         "company": job.company,
         "title": job.title or "(직무 미기재)",
-        "tags": ", ".join(tags) if tags else "(경험 카드 없음 — keywords는 공고 표기 그대로 씁니다)",
+        "tags": fit_list(tags, TAGS_MAX_CHARS) if tags else "(경험 카드 없음 — keywords는 공고 표기 그대로 씁니다)",
         "keywords": ", ".join(keywords) if keywords else "(없음)",
         "candidates": "\n".join(f"- {c}" for c in candidates if c) or "(없음)",
         "posting": posting,

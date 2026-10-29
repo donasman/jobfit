@@ -89,7 +89,11 @@ def prepare(project: Project, job: Job, force: bool = False) -> Prepared:
     return Prepared(status="ready", prompt_path=current, chars=len(current.read_text(encoding="utf-8")), limit=LIMITS[STEP])
 
 
-def build_prompt(project: Project, job: Job, compact: bool = False) -> str:
+# 상한을 넘으면 줄이는 단계: 0 그대로 · 1 STAR 120자, 보조 카드 STAR 빼기 · 2 STAR 60자. facts는 끝까지 남긴다(숫자의 근거)
+STAR_CUT = {0: None, 1: 120, 2: 60}
+
+
+def build_prompt(project: Project, job: Job, compact: int = 0) -> str:
     match = load_match(project, job)
     analysis = load_analysis(project, job)
     cards = {str(c.get("id")): c for c in load_cards(project.experiences_file)[0]}
@@ -114,12 +118,14 @@ def build_prompt(project: Project, job: Job, compact: bool = False) -> str:
         "questions": "\n\n".join(_question_block(q, cards, compact) for q in questions),
     }
     text = render(load_template(project, STEP), values)
-    if len(text) > LIMITS[STEP] and not compact:
-        return build_prompt(project, job, compact=True)
+    if len(text) > LIMITS[STEP] and int(compact) < max(STAR_CUT):
+        return build_prompt(project, job, compact=int(compact) + 1)
     return text
 
 
-def _question_block(q: dict, cards: dict[str, dict], compact: bool) -> str:
+def _question_block(q: dict, cards: dict[str, dict], compact: int | bool) -> str:
+    level = int(compact)
+    cut = STAR_CUT[level]
     out = [f"### {q['id']}. {q['text']}", f"- 글자수: {_limit_text(q)}", f"- 문항 유형: {q['type']}"]
     if not q.get("cards"):
         out.append("- 배정된 경험이 없습니다. 경험 내용이 필요하면 [확인 필요: 어떤 경험] 으로 비워 두세요.")
@@ -132,11 +138,11 @@ def _question_block(q: dict, cards: dict[str, dict], compact: bool) -> str:
         flag = " (사실 확인 전 카드 — 숫자는 [확인 필요]로)" if not is_verified(card) else ""
         out.append(f"- {label}: {card.get('title', pick['id'])}" + (f" ({meta})" if meta else "") + flag)
         star = card.get("star") if isinstance(card.get("star"), dict) else {}
-        if pick["role"] == "주력" or not compact:
+        if pick["role"] == "주력" or not level:
             for key, name in _STAR_LABELS:
                 value = str(star.get(key) or "").strip()
                 if value:
-                    out.append(f"  - {name}: {value[:120] + '…' if compact and len(value) > 120 else value}")
+                    out.append(f"  - {name}: {value[:cut] + '…' if cut and len(value) > cut else value}")
         facts = [str(f) for f in (card.get("facts") or [])]
         out.append("  - 쓸 수 있는 사실: " + ("; ".join(f'"{f}"' for f in facts) if facts else "(없음 — 숫자를 쓰지 마세요)"))
     return "\n".join(out)

@@ -11,6 +11,7 @@ from jobfit.state import now
 
 # 프롬프트 글자수 상한(SPEC §5). 넘으면 경고하고 줄일 대상을 알려 준다
 LIMITS = {"analyze": 6000, "draft": 8000, "revise": 6000, "style-rules": 6000, "exp-extract": 8000}
+TAGS_MAX_CHARS = 600  # 프롬프트에 넣는 태그 목록 최대 글자수 — 카드가 늘어도 프롬프트가 끝없이 길어지지 않게
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 
@@ -25,6 +26,22 @@ def render(template: str, values: dict[str, str]) -> str:
     if missing:
         raise KeyError(f"프롬프트 템플릿의 빈칸에 넣을 값이 없습니다: {', '.join(missing)}")
     return _PLACEHOLDER.sub(lambda m: values[m.group(1)], template)
+
+
+def fit_list(items: list[str], budget: int, sep: str = ", ") -> str:
+    """앞에서부터 budget 글자 안에 들어가는 만큼, 나머지는 '외 N개'."""
+    if not items:
+        return "(없음)"
+    out: list[str] = []
+    used = 0
+    for item in items:
+        tail = len(f"{sep}외 {len(items)}개")
+        if used + len(item) + len(sep) + tail > budget and out:
+            break
+        out.append(item)
+        used += len(item) + len(sep)
+    rest = len(items) - len(out)
+    return sep.join(out) + (f"{sep}외 {rest}개" if rest else "")
 
 
 def sha1(text: str) -> str:

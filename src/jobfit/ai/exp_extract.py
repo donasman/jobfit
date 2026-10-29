@@ -22,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-from jobfit.ai.promptfile import LIMITS, load_template, log_usage, render
+from jobfit.ai.promptfile import LIMITS, TAGS_MAX_CHARS, fit_list, load_template, log_usage, render
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import mask_contacts
 from jobfit.experiences import EXAMPLE_NOTE, FILE_HEADER, card_tags, example_ids, load_cards, normalize_type
@@ -158,17 +158,17 @@ def prepare(project: Project) -> list[WorkItem]:
     items: list[WorkItem] = []
     kd = KeywordDict.load(project.data_dir)
     cards, _ = load_cards(project.experiences_file)
-    existing = "\n".join(f"- {c.get('id')}: {c.get('title', '')}" for c in cards if c.get("id")) or "(없음)"
     card_tag_list = [t for c in cards for t in card_tags(c, kd)]
+    template = load_template(project, STEP)
     project.exp_dir.mkdir(parents=True, exist_ok=True)
     for rel, info in state.get("files", {}).items():
         if info.get("status") != "pending":
             continue
         text = _text_cache(project, info["slug"]).read_text(encoding="utf-8") if not info.get("direct") else ""
         parts = _split(text) if text else [""]
-        # 태그 표기: 자료에 나온 기술 낱말 + 이미 쓰는 카드 태그 (사전 전체를 넣으면 프롬프트가 길어진다)
+        # 태그 표기: 자료에 나온 기술 낱말 먼저, 그다음 이미 쓰는 카드 태그 (사전 전체를 넣으면 프롬프트가 길어진다)
         found = [canon for canon, _ in kd.scan(text)] if text else []
-        tags = ", ".join(t for t in dict.fromkeys([*found, *card_tag_list]) if t not in ROLE_WORDS) or "(없음)"
+        tag_items = [t for t in dict.fromkeys([*found, *card_tag_list]) if t not in ROLE_WORDS]
         for n, chunk in enumerate(parts, start=1):
             if n in info.get("done_parts", []):
                 continue
@@ -183,13 +183,17 @@ def prepare(project: Project) -> list[WorkItem]:
                 body = chunk
             values = {
                 "response_path": project.rel(item.response),
-                "existing": existing,
-                "tags": tags,
+                "existing": "",
+                "tags": "",
                 "source_name": Path(rel).name,
                 "part": f" (조각 {n}/{len(parts)})" if len(parts) > 1 else "",
                 "source": body,
             }
-            prompt = render(load_template(project, STEP), values)
+            # 카드가 늘어도 상한을 넘지 않게: 남는 자리에 태그 목록(최대 1/3)과 이미 있는 카드 목록을 맞춰 넣는다
+            room = limit() - len(render(template, values)) - 20
+            values["tags"] = fit_list(tag_items, min(TAGS_MAX_CHARS, max(room // 3, 0)))
+            values["existing"] = fit_existing(cards, room - len(values["tags"]))
+            prompt = render(template, values)
             if not item.prompt.exists() or item.prompt.read_text(encoding="utf-8") != prompt:
                 item.prompt.write_text(prompt, encoding="utf-8")
                 log_usage(project, rel, STEP, "prompt", len(prompt))
@@ -419,6 +423,30 @@ def card_yaml(card: dict) -> str:
 
 
 # --- 내부 ---
+
+
+def fit_existing(cards: list[dict], budget: int) -> str:
+    """이미 있는 카드 목록. 자리가 모자라면 id를 빼고 제목만, 그래도 모자라면 앞에서부터 자르고 '외 N개'.
+    같은 제목의 카드는 accept 가 건너뛰므로 목록이 잘려도 중복 카드가 파일에 들어가지는 않는다."""
+    named = [c for c in cards if c.get("id")]
+    if not named:
+        return "(없음)"
+    full = "\n".join(f"- {c.get('id')}: {c.get('title', '')}" for c in named)
+    if len(full) <= budget:
+        return full
+    titles = [f"- {c.get('title') or c.get('id')}" for c in named]
+    short = "\n".join(titles)
+    if len(short) <= budget:
+        return short
+    note = "- … 외 {n}개 (제목이 같은 카드는 스크립트가 건너뜁니다)"
+    out: list[str] = []
+    used = len(note) + 4
+    for line in titles:
+        if used + len(line) + 1 > budget:
+            break
+        out.append(line)
+        used += len(line) + 1
+    return "\n".join([*out, note.format(n=len(titles) - len(out))])
 
 
 def _digest(path: Path) -> str:

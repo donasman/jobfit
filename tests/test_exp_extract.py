@@ -236,6 +236,29 @@ def test_star_numbers_must_be_in_facts(tmp_path, capsys):
     assert "70%" not in out.split("star에 facts에 없는 숫자가 있습니다:")[1].split("\n")[0]
 
 
+def test_prompt_stays_under_limit_with_many_cards(tmp_path):
+    project = _project(tmp_path)
+    many = [
+        {"id": f"exp-project-number-{n}", "title": f"아주 긴 제목의 프로젝트 경험 카드 번호 {n} — 백엔드 성능 개선과 운영", "tags": [f"Tag{n}", "Java"], "summary": "s", "usable_for": ["직무역량"]}
+        for n in range(120)
+    ]
+    project.experiences_file.write_text(yaml.safe_dump(many, allow_unicode=True), encoding="utf-8")
+    (project.sources_dir / "long.md").write_text("프로젝트 경험 문단입니다. " * 600, encoding="utf-8")
+    cli.main(["--root", str(tmp_path), "exp", "extract"])
+    for item in exp_extract.pending_items(project):
+        prompt = item.prompt.read_text(encoding="utf-8")
+        assert len(prompt) <= exp_extract.limit(), len(prompt)
+        assert "외 " in prompt.split("## 이미 있는 카드")[1].split("## 태그")[0]  # 다 못 넣으면 몇 개를 뺐는지 적는다
+        assert "{{" not in prompt
+
+
+def test_fit_existing_prefers_full_then_titles():
+    cards = [{"id": "exp-a", "title": "주문 API"}, {"id": "exp-b", "title": "배치 개선"}]
+    assert exp_extract.fit_existing(cards, 1000) == "- exp-a: 주문 API\n- exp-b: 배치 개선"
+    assert exp_extract.fit_existing(cards, 20) == "- 주문 API\n- 배치 개선"
+    assert exp_extract.fit_existing([], 100) == "(없음)"
+
+
 def test_append_to_empty_list_file(tmp_path):
     project = _project(tmp_path)
     project.experiences_file.write_text("# 내 카드\n[]\n", encoding="utf-8")
