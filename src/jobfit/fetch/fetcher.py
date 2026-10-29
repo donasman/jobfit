@@ -30,6 +30,12 @@ FILE_PDF = "source.pdf"
 FILE_META = "fetch.json"
 
 PASTE_HINT = "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
+# 프록시·DNS·SSL·연결 실패 — 사이트가 아니라 실행 환경(에이전트의 가상 머신·샌드박스)의 인터넷이 막힌 경우가 많다
+NETWORK_HINT = (
+    "이 PC에서 start.bat 2번(공고 처리 진행)을 한 번 실행해 공고를 받아 오세요"
+    " — 에이전트가 도는 가상 머신·샌드박스는 인터넷이 막혀 있을 수 있습니다. 그래도 안 되면 공고 본문 붙여넣기(start.bat 5번)"
+)
+NETWORK_ERROR_MARK = "인터넷 연결 문제로 받지 못했습니다"
 
 
 @dataclass
@@ -44,6 +50,7 @@ class FetchResult:
     next_hint: str = ""
     notes: list[str] = field(default_factory=list)
     fetched_at: str = ""
+    network: bool = False  # 실행 환경의 인터넷 문제로 실패
 
 
 class _Blocked(Exception):
@@ -53,7 +60,7 @@ class _Blocked(Exception):
 def fetch_job(url: str, key: JobKey, job_dir: Path, respect_robots: bool = True) -> FetchResult:
     job_dir.mkdir(parents=True, exist_ok=True)
     plan = plan_for(url, key)
-    result = FetchResult(ok=False, url=url, notes=list(plan.notes), fetched_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    result = FetchResult(ok=False, url=url, fetched_at=time.strftime("%Y-%m-%d %H:%M:%S"))
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.5"})
     try:
@@ -93,9 +100,14 @@ def fetch_job(url: str, key: JobKey, job_dir: Path, respect_robots: bool = True)
             else:
                 result.notes.append(f"상세 페이지 응답 {detail.status_code}: {durl}")
         result.ok = True
+        result.notes[:0] = list(plan.notes)  # '상세요강을 따로 받았다' 같은 설명은 받았을 때만
     except _Blocked:
         result.error = "사이트가 robots.txt로 자동 수집을 막아 두었습니다"
         result.next_hint = PASTE_HINT
+    except requests.ConnectionError as e:  # ProxyError·SSLError·ConnectTimeout·DNS 실패 포함
+        result.error = f"{NETWORK_ERROR_MARK}({e.__class__.__name__})"
+        result.next_hint = NETWORK_HINT
+        result.network = True
     except requests.Timeout:
         result.error = f"{TIMEOUT}초 안에 응답이 없었습니다"
         result.next_hint = PASTE_HINT

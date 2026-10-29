@@ -113,6 +113,8 @@ def cmd_add(project: Project, args) -> int:
         elif not company:
             print(f"공고를 받지 못해 회사명을 알 수 없습니다 — {result.error}")
             print('회사명을 알려 주세요:  jobfit add "<링크>" --company <회사명>')
+            if result.network:
+                print(f"  {result.next_hint}")
             return 1
     if not company:
         print('페이지에서 회사명을 읽지 못했습니다. 회사명을 알려 주세요:  jobfit add "<링크>" --company <회사명>')

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from jobfit.clean.keywords import KeywordDict
 from jobfit.experiences import check_cards, example_ids, load_cards
+from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
 from jobfit.paths import Project
-from jobfit.state import State
+from jobfit.state import STATUS_ERROR, State
 
 HEADER = "[사용자에게 전할 것] 에이전트는 아래 줄을 요약하지 말고 빠짐없이 그대로 사용자에게 전하세요 — 사람이 직접 해야 하는 일입니다"
 LOOSE_STAR = "star에 facts에 없는 숫자가 있습니다"
@@ -63,6 +64,22 @@ def collect(project: Project, state: State | None = None) -> list[str]:
 
     if (project.me_dir / "style" / "style_rules.new.md").exists():
         out.append("me/style/style_rules.new.md 가 있습니다 — style_rules.md 와 비교해 쓸 쪽만 style_rules.md 로 남기세요")
+
+    if state is not None:
+        failed = [j for j in sorted(state.active_jobs(), key=lambda j: j.row) if j.status == STATUS_ERROR]
+        net = [j for j in failed if NETWORK_ERROR_MARK in j.error]
+        paste = [j for j in failed if j not in net]
+        if net:
+            out.append(
+                f"공고 {len(net)}개를 이 환경에서 받지 못했습니다(인터넷 연결 문제: {_ids([j.company for j in net])}) — "
+                "이 PC에서 start.bat 을 열고 2번(공고 처리 진행)을 한 번 실행해 주세요. 받아 온 뒤 에이전트에게 다시 '새 공고 처리해줘'"
+            )
+        if paste:
+            out.append(
+                "공고 본문을 붙여 넣어야 합니다: " + ", ".join(f"{j.company}({j.error})" for j in paste[:MAX_LISTED])
+                + (f" 외 {len(paste) - MAX_LISTED}개" if len(paste) > MAX_LISTED else "")
+                + " — 브라우저에서 본문을 복사해 start.bat 5번(공고 본문 붙여넣기)으로 넣은 뒤 다시 요청하세요"
+            )
 
     if state is not None and state.sheet_errors:
         errs = state.sheet_errors

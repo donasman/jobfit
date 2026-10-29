@@ -18,7 +18,7 @@ from jobfit.clean.posting import FILE_POSTING, clean_job
 from jobfit.dashboard import DashboardBusy, build_dashboard
 from jobfit.excel.reader import JobRow, QuestionRow, ReadResult, read_jobs_workbook
 from jobfit.experiences import file_sha
-from jobfit.fetch.fetcher import FILE_MAIN, FILE_META, fetch_job
+from jobfit.fetch.fetcher import FILE_MAIN, FILE_META, NETWORK_ERROR_MARK, fetch_job
 from jobfit.match import inputs_sha, load_match, run_match
 from jobfit.paths import Project
 from jobfit.report import FILE_REPORT, write_report
@@ -360,6 +360,8 @@ def response_name(job: Job, step: str) -> str:
 
 def _job_action(project: Project, job: Job) -> Action | None:
     if job.status == STATUS_ERROR:
+        if NETWORK_ERROR_MARK in job.error:  # 붙여넣기보다 이 PC에서 한 번 받는 게 먼저
+            return Action(kind="paste", message=f"{job.company}: {job.error}. {job.next_hint}", command="start.bat 2번 (이 PC에서) — 또는 jobfit run", job=job)
         return Action(kind="paste", message=f"{job.company}: {job.error}. {job.next_hint}", command=f"jobfit posting --job {job.key} --from-clipboard", job=job)
     stale = _stale_reason(project, job)
     if stale:
