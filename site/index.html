@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jobfit — 공고 기반 자소서 파이프라인</title>
+<meta name="description" content="채용공고 링크 하나로 공고 분석, 경험 매칭, 자소서 초안, 지어낸 숫자 검사까지. 스크립트가 보장하고 AI는 판단만 한다. 무료 웹 채팅이나 Claude Code·Codex로 쓴다.">
+<meta property="og:title" content="jobfit — 공고 기반 자소서 파이프라인">
+<meta property="og:description" content="채용공고 링크 하나로 공고 분석 · 경험 매칭 · 자소서 초안 · 검사까지. 스크립트가 보장하고 AI는 판단만 한다.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://donasman.github.io/jobfit/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bd3'/%3E%3Cpath d='M9 17l5 5 9-12' stroke='white' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f5f7fb;
+  --card: #ffffff;
+  --text: #16181d;
+  --muted: #5b6270;
+  --line: #e3e7ef;
+  --accent: #2f5bd3;
+  --accent-soft: #e8eefc;
+  --ai: #8a4fd8;
+  --ai-soft: #f2eafd;
+  --ok: #1f8a4c;
+  --warn: #b26a00;
+  --bad: #c43a3a;
+  --code-bg: #0f1420;
+  --code-text: #e6e9f2;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 16px rgba(16, 24, 40, .06);
+  --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  --mono: "D2Coding", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1017;
+    --bg-soft: #131824;
+    --card: #161c29;
+    --text: #e8ebf2;
+    --muted: #9aa3b5;
+    --line: #262e3f;
+    --accent: #7c9cff;
+    --accent-soft: #1c2742;
+    --ai: #b892ff;
+    --ai-soft: #251c3a;
+    --ok: #4cc884;
+    --warn: #f0b34a;
+    --bad: #ff7b7b;
+    --code-bg: #0a0d14;
+    --code-text: #dfe4ef;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16.5px;
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre { font-family: var(--mono); }
+:not(pre) > code {
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: .05em .4em;
+  font-size: .9em;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+/* 상단 */
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+header.top .wrap { display: flex; align-items: center; gap: 20px; height: 58px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--text); font-size: 18px; }
+.brand:hover { text-decoration: none; }
+.brand svg { width: 26px; height: 26px; }
+nav.toc { display: flex; gap: 18px; margin-left: auto; font-size: 14.5px; }
+nav.toc a { color: var(--muted); }
+nav.toc a:hover { color: var(--text); text-decoration: none; }
+@media (max-width: 760px) { nav.toc { display: none; } }
+
+/* 첫 화면 */
+.hero { padding: 72px 0 56px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--accent-soft), transparent 70%); }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.25; margin: 0 0 16px; letter-spacing: -0.02em; }
+.hero p.lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); margin: 0 0 28px; max-width: 760px; }
+.hero p.lead strong { color: var(--text); }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 20px; border-radius: 10px; font-weight: 700; font-size: 15.5px;
+  border: 1px solid var(--line); color: var(--text); background: var(--card);
+}
+.btn:hover { text-decoration: none; border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { .btn.primary { color: #0d1017; } }
+.btn svg { width: 18px; height: 18px; }
+.meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+/* 절 */
+section { padding: 64px 0; border-bottom: 1px solid var(--line); }
+section:nth-of-type(even) { background: var(--bg-soft); }
+h2 { font-size: clamp(24px, 3.4vw, 32px); margin: 0 0 10px; letter-spacing: -0.01em; }
+h2 + p.sub { color: var(--muted); margin: 0 0 32px; max-width: 760px; }
+h3 { font-size: 19px; margin: 0 0 8px; }
+
+.grid { display: grid; gap: 16px; }
+.grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 860px) { .grid.c3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .grid.c3, .grid.c2 { grid-template-columns: 1fr; } }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 22px; box-shadow: var(--shadow);
+}
+.card p { margin: 0; color: var(--muted); }
+.card .icon {
+  width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); margin-bottom: 12px;
+}
+.card .icon.ai { background: var(--ai-soft); color: var(--ai); }
+.card .icon svg { width: 22px; height: 22px; }
+
+/* 흐름도 */
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin: 8px 0 24px; }
+.step {
+  flex: 1 1 140px; min-width: 130px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 14px 12px; position: relative; box-shadow: var(--shadow);
+}
+.step .n { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.step b { display: block; font-size: 15.5px; margin: 2px 0 4px; }
+.step span { color: var(--muted); font-size: 13.5px; line-height: 1.5; display: block; }
+.step.ai { border-color: color-mix(in srgb, var(--ai) 45%, var(--line)); background: var(--ai-soft); }
+.step.ai .n { color: var(--ai); }
+.badge {
+  display: inline-block; font-size: 11.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+  background: var(--ai); color: #fff; margin-left: 6px; vertical-align: 2px;
+}
+@media (prefers-color-scheme: dark) { .badge { color: #0d1017; } }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
+.legend i.s { background: var(--card); }
+.legend i.a { background: var(--ai-soft); border-color: var(--ai); }
+
+/* 원칙 목록 */
+ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+ul.checks li { display: flex; gap: 12px; align-items: flex-start; }
+ul.checks li svg { flex: none; width: 22px; height: 22px; color: var(--ok); margin-top: 3px; }
+ul.checks li div b { display: block; }
+ul.checks li div span { color: var(--muted); }
+
+/* 표 */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--bg-soft); font-weight: 700; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 700; white-space: nowrap; }
+
+/* 단계 목록 */
+ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+ol.steps > li { counter-increment: s; position: relative; padding-left: 46px; }
+ol.steps > li::before {
+  content: counter(s); position: absolute; left: 0; top: 0;
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-weight: 800; font-size: 15px;
+}
+@media (prefers-color-scheme: dark) { ol.steps > li::before { color: #0d1017; } }
+ol.steps > li b { display: block; margin-bottom: 2px; }
+ol.steps > li p { margin: 0; color: var(--muted); }
+.kbd {
+  display: inline-block; min-width: 1.6em; text-align: center; font-weight: 800; font-family: var(--mono);
+  padding: 0 .45em; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px;
+  background: var(--card); color: var(--text); font-size: .92em;
+}
+
+/* 코드 */
+.code { position: relative; margin: 12px 0 0; }
+.code pre {
+  margin: 0; background: var(--code-bg); color: var(--code-text); border-radius: 12px;
+  padding: 16px 18px; overflow-x: auto; font-size: 14px; line-height: 1.6;
+}
+.code .label {
+  position: absolute; top: 0; right: 0; font-size: 12px; color: #9aa3b5;
+  padding: 6px 12px; font-family: var(--mono);
+}
+.code button.copy {
+  position: absolute; bottom: 8px; right: 8px; font: inherit; font-size: 12.5px;
+  border: 1px solid #39425a; background: #1b2232; color: #dfe4ef; border-radius: 7px; padding: 3px 10px; cursor: pointer;
+}
+.code button.copy:hover { border-color: #7c9cff; }
+.c-key { color: #8fb4ff; } .c-str { color: #a8e6a1; } .c-com { color: #7f8aa3; } .c-num { color: #ffcf8a; }
+
+/* 탭 */
+.tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.tabs button {
+  font: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+  padding: 9px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--muted);
+}
+.tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { .tabs button[aria-selected="true"] { color: #0d1017; } }
+.panel[hidden] { display: none; }
+
+/* 결과 예시 */
+.doc {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.doc .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--bg-soft); font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.doc .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: inline-block; }
+.doc .body { padding: 18px 22px; font-size: 15px; }
+.doc .body h4 { margin: 14px 0 6px; font-size: 16px; }
+.doc .body h4:first-child { margin-top: 0; }
+.doc .body p, .doc .body li { color: var(--muted); }
+.doc .body ul { margin: 4px 0; padding-left: 20px; }
+.mark-bad { color: var(--bad); font-weight: 700; }
+.mark-warn { color: var(--warn); font-weight: 700; }
+.mark-ok { color: var(--ok); font-weight: 700; }
+.hl { background: color-mix(in srgb, var(--warn) 22%, transparent); border-radius: 4px; padding: 0 3px; color: var(--text); }
+
+/* 자주 묻는 질문 */
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+details + details { margin-top: 10px; }
+details summary { cursor: pointer; font-weight: 700; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: "+"; display: inline-block; width: 1.2em; color: var(--accent); font-weight: 800; }
+details[open] summary::before { content: "–"; }
+details p { margin: 10px 0 0; color: var(--muted); }
+
+.note {
+  border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0;
+  padding: 12px 16px; margin-top: 20px; color: var(--text);
+}
+.note.warn { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+
+footer { padding: 40px 0 56px; color: var(--muted); font-size: 14.5px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
+footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#2f5bd3"/><path d="M9 17l5 5 9-12" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      jobfit
+    </a>
+    <nav class="toc" aria-label="목차">
+      <a href="#features">기능</a>
+      <a href="#how">작동 방식</a>
+      <a href="#modes">두 가지 모드</a>
+      <a href="#start">시작하기</a>
+      <a href="#usage">사용법</a>
+      <a href="#faq">자주 묻는 질문</a>
+      <a href="https://github.com/donasman/jobfit">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>채용공고 링크 하나로<br>공고 분석부터 자소서 초안까지</h1>
+    <p class="lead">jobfit은 공고를 받아 정리하고, AI가 공고를 분석해 <strong>내 경험 카드</strong>와 맞춘 뒤 자소서 초안을 씁니다. 그다음 스크립트가 <strong>글자수 · 지어낸 숫자 · 연락처</strong>를 검사해 한 장으로 정리합니다. <strong>스크립트가 보장하고, AI는 판단만 합니다.</strong></p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/donasman/jobfit/releases/download/v0.1.0/jobfit-v0.1.0.zip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+        v0.1.0 내려받기 (zip)
+      </a>
+      <a class="btn" href="https://github.com/donasman/jobfit">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+        GitHub에서 보기
+      </a>
+    </div>
+    <p class="meta">무료 · 오픈소스(MIT) · API 키 필요 없음 · Windows · macOS · 무료 웹 채팅 또는 Claude Code · Codex</p>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>무엇을 해 주나요</h2>
+    <p class="sub">공고 한 건을 넣으면 지원 준비에 필요한 것을 한 장으로 돌려줍니다. 개발 공고처럼 자소서 문항이 없는 공고도 매칭과 이력서 강조 포인트까지는 나옵니다.</p>
+    <div class="grid c3">
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg></div>
+        <h3>공고 받기 · 정리</h3>
+        <p>링크만 적으면 사람인 · 잡코리아 상세요강까지 받아 메뉴와 광고를 걷어내고 자격 요건 · 업무 · 우대 사항 순으로 정리합니다. 회사명 · 직무 · 마감일도 페이지에서 읽어 옵니다.</p>
+      </div>
+      <div class="card">
+        <div class="icon ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <h3>AI 공고 분석</h3>
+        <p>필수 · 우대 역량, 주요 업무, 키워드를 뽑습니다. 자소서 문항은 공고에 <b>원문 그대로</b> 있는 것만 받아들이고, AI가 지어낸 문항은 버립니다.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M8 12l3 3 5-6"/></svg></div>
+        <h3>경험 카드 매칭</h3>
+        <p>내 경험 카드의 태그와 공고 낱말을 맞춰 점수를 매기고, 문항마다 쓸 경험을 고릅니다. 이력서에서 위로 올릴 항목과 공고 표기로 맞출 단어(스프링부트 → Spring Boot)도 알려 줍니다.</p>
+      </div>
+      <div class="card">
+        <div class="icon ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+        <h3>AI 자소서 초안</h3>
+        <p>문항별로 배정된 경험의 상황 · 과제 · 행동 · 결과와 <b>확정한 사실</b>만 넘겨 초안을 받습니다. 모르는 부분은 지어내지 않고 <code>[확인 필요: …]</code>로 비워 둡니다.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>스크립트 검사</h3>
+        <p>글자수, 경험 카드에 없는 숫자(계산해서 만든 "78% 개선"도), 연락처, 피하고 싶은 표현을 잡습니다. 걸린 문항만 AI에게 한 번 고치게 하고, 그래도 남으면 표시해 둡니다.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h3>한눈에 정리</h3>
+        <p>공고마다 <code>report.md</code> 한 장, 전체 현황은 <code>dashboard.xlsx</code>(D-day · 매칭 점수 · 초안 상태 · 다음 할 일). Notion으로 가져갈 CSV도 만듭니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>작동 방식</h2>
+    <p class="sub">AI가 하는 일은 보라색 두세 칸뿐입니다. 나머지는 전부 스크립트가 하고, AI의 답도 스크립트가 검사한 뒤에만 받아들입니다.</p>
+    <div class="flow" role="list">
+      <div class="step" role="listitem"><div class="n">1</div><b>공고 받기 · 정리</b><span>링크 한 건씩, 본문만</span></div>
+      <div class="step ai" role="listitem"><div class="n">2</div><b>공고 분석<span class="badge">AI</span></b><span>필수 · 우대 · 키워드 · 문항</span></div>
+      <div class="step" role="listitem"><div class="n">3</div><b>매칭</b><span>경험 카드와 점수 · 배정</span></div>
+      <div class="step" role="listitem"><div class="n">4</div><b>report.md</b><span>요약 · 매칭 · 강조 포인트</span></div>
+      <div class="step ai" role="listitem"><div class="n">5</div><b>자소서 초안<span class="badge">AI</span></b><span>문항이 있을 때만</span></div>
+      <div class="step" role="listitem"><div class="n">6</div><b>검사</b><span>글자수 · 숫자 · 연락처</span></div>
+      <div class="step ai" role="listitem"><div class="n">7</div><b>수정 1회<span class="badge">AI</span></b><span>걸린 문항만</span></div>
+    </div>
+    <div class="legend"><span><i class="s"></i>스크립트</span><span><i class="a"></i>AI — 프롬프트 파일 하나를 보고 답 하나만 냄</span></div>
+
+    <div class="grid c2" style="margin-top:32px">
+      <div class="card">
+        <h3>지켜지는 것</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>경험 카드 facts 밖의 숫자 금지</b><span>3천만 = 30,000,000 = 3,000만처럼 표기가 달라도 같은 값으로 비교하고, Java 17 · S3 같은 이름 속 숫자는 숫자로 보지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>문항을 추측하지 않음</b><span>공고에 문항이 없으면 만들지 않습니다. 필요하면 내가 직접 입력합니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>공고는 자료, 지시가 아님</b><span>공고 본문 속 문장이 AI에게 무엇을 시켜도 따르지 않도록 모든 프롬프트에 적혀 있습니다.</span></div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>내 정보는</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 컴퓨터에만</b><span>경험 카드 · 이력서 항목 · 자소서 샘플은 <code>me/</code> 폴더에 있고, 저장소나 배포본에 들어가지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>AI에는 필요한 만큼만</b><span>문항마다 고른 경험 카드 두 개의 내용과 태그 목록만 넘어갑니다. 공고 속 담당자 연락처는 가려서 넘깁니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>크롤러 없음</b><span>내가 적은 링크 한 건씩만 받고 robots.txt를 따릅니다. 사이트를 돌며 긁어 오지 않습니다.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="modes">
+  <div class="wrap">
+    <h2>두 가지 쓰는 방식</h2>
+    <p class="sub">같은 스크립트 · 같은 프롬프트 · 같은 결과 파일입니다. 차이는 AI 단계를 누가 실행하느냐뿐입니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>붙여넣기 모드</th><th>에이전트 모드</th></tr></thead>
+        <tbody>
+          <tr><td>AI</td><td>아무 무료 웹 채팅 — ChatGPT · Claude · Gemini</td><td>폴더에서 명령을 실행하는 AI — Claude Code · Codex (CLI · 데스크톱 앱 · IDE)</td></tr>
+          <tr><td>요금</td><td>무료</td><td>각 서비스 유료 플랜</td></tr>
+          <tr><td>하는 일</td><td><code>start.bat</code> 메뉴. AI 단계마다 프롬프트 복사 → 웹 채팅에 붙여넣기 → 답 복사</td><td>"이 링크 공고 처리해줘" 한 마디</td></tr>
+          <tr><td>공고 1건</td><td>복사 · 붙여넣기 2~3번</td><td>기다리기만</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">웹 채팅이 내 폴더를 볼 수 없어도 됩니다. 스크립트가 필요한 내용을 전부 프롬프트 한 덩어리에 담고, 답은 클립보드로 받아옵니다.</div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>시작하기</h2>
+    <p class="sub">설치는 두 단계입니다. Python은 따로 깔지 않아도 됩니다.</p>
+    <div class="grid c2">
+      <div class="card">
+        <h3>준비물</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>Windows 또는 macOS</b></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b><a href="https://docs.astral.sh/uv/">uv</a></b><span>Python과 필요한 패키지를 알아서 받습니다. 없으면 <code>start.bat</code>이 설치 명령을 알려 줍니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>Microsoft Excel</b><span>공고 목록 <code>jobs.xlsx</code>를 편집합니다.</span></div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>설치</h3>
+        <ol class="steps">
+          <li><b>zip 받아서 풀기</b><p><a href="https://github.com/donasman/jobfit/releases/download/v0.1.0/jobfit-v0.1.0.zip">jobfit-v0.1.0.zip</a>을 원하는 폴더에 풉니다.</p></li>
+          <li><b><code>start.bat</code> 실행 → <span class="kbd">1</span> 처음 설정</b><p>macOS는 <code>./start.sh</code>. <code>jobs.xlsx</code>, <code>me/</code>, <code>output/</code>이 생깁니다.</p></li>
+        </ol>
+      </div>
+    </div>
+    <div class="code"><span class="label">uv가 없을 때 — Windows PowerShell</span><pre><code>powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"</code></pre><button class="copy" type="button">복사</button></div>
+    <div class="code"><span class="label">uv가 없을 때 — macOS</span><pre><code>curl -LsSf https://astral.sh/uv/install.sh | sh</code></pre><button class="copy" type="button">복사</button></div>
+  </div>
+</section>
+
+<section id="usage">
+  <div class="wrap">
+    <h2>사용법</h2>
+    <p class="sub">처음 한 번 내 경험 카드를 넣고, 그다음부터는 공고마다 링크만 적으면 됩니다.</p>
+
+    <div class="tabs" role="tablist" aria-label="사용법">
+      <button role="tab" aria-selected="true" aria-controls="p-me" id="t-me">① 내 정보 넣기</button>
+      <button role="tab" aria-selected="false" aria-controls="p-paste" id="t-paste">② 붙여넣기 모드</button>
+      <button role="tab" aria-selected="false" aria-controls="p-agent" id="t-agent">③ 에이전트 모드</button>
+    </div>
+
+    <div class="panel" role="tabpanel" id="p-me" aria-labelledby="t-me">
+      <div class="grid c2">
+        <div>
+          <p><code>me/experiences.yaml</code>에 경험을 카드 하나씩 적습니다. 처음에는 예시가 들어 있으니 내 경험으로 바꿉니다. 가장 중요한 건 <b>facts</b> — 확정한 수치와 사실만 적습니다. 초안에 나오는 숫자는 전부 여기 있어야 합니다.</p>
+          <ol class="steps" style="margin-top:18px">
+            <li><b>카드 고치기</b><p>메뉴 <span class="kbd">7</span> → <span class="kbd">5</span>로 빈 카드를 추가할 수도 있습니다.</p></li>
+            <li><b>검사하기</b><p>메뉴 <span class="kbd">7</span> → <span class="kbd">4</span>. 빠진 칸, 태그 표기, facts에 없는 숫자를 알려 줍니다.</p></li>
+            <li><b>(선택) 이력서 · 문체</b><p><code>me/resume.yaml</code>에 이력서 항목을, <code>me/samples/</code>에 내가 쓴 자소서를 넣으면 이력서 강조 포인트와 문체 맞추기가 더해집니다.</p></li>
+          </ol>
+        </div>
+        <div class="code"><span class="label">me/experiences.yaml</span><pre><code><span class="c-key">- id:</span> exp-order-api
+  <span class="c-key">title:</span> 주문 조회 API 응답 시간 개선
+  <span class="c-key">period:</span> 2025-03 ~ 2025-05
+  <span class="c-key">tags:</span> [Java, Spring Boot, JPA, Redis, 성능 최적화]
+  <span class="c-key">summary:</span> <span class="c-str">"N+1을 없애고 캐시를 붙여 응답 시간을 줄인 경험"</span>
+  <span class="c-key">star:</span>
+    <span class="c-key">situation:</span> 주문 목록 화면이 느리다는 문의가 반복됐다.
+    <span class="c-key">task:</span> API 계약을 바꾸지 않고 응답 시간을 줄인다.
+    <span class="c-key">action:</span> 쿼리 로그로 N+1을 찾아 묶고 캐시를 붙였다.
+    <span class="c-key">result:</span> 응답 시간이 줄고 쿼리 수가 고정됐다.
+  <span class="c-key">facts:</span>                <span class="c-com"># 확정한 수치 · 사실만</span>
+    - <span class="c-str">"p95 응답 시간 1.8초 → 0.4초"</span>
+    - <span class="c-str">"주문 1건당 DB 쿼리 21회 → 1회"</span>
+  <span class="c-key">usable_for:</span> [직무역량, 문제해결]
+  <span class="c-key">verified:</span> <span class="c-num">true</span>         <span class="c-com"># 확인 전이면 false</span></code></pre></div>
+      </div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="p-paste" aria-labelledby="t-paste" hidden>
+      <ol class="steps">
+        <li><b>공고 적기</b><p><code>jobs.xlsx</code> 공고 시트에 회사명 · 직무 · 링크 · 마감일을 한 줄씩. 엑셀을 닫은 상태라면 <code>uv run jobfit add "링크"</code> 한 줄로도 됩니다(회사명 · 직무 · 마감일을 페이지에서 읽어 넣음).</p></li>
+        <li><b>메뉴 <span class="kbd">2</span> 공고 처리 진행</b><p>공고를 받아 정리하고 AI 단계 앞에서 멈춥니다.</p></li>
+        <li><b>메뉴 <span class="kbd">3</span> 프롬프트 복사 → 웹 채팅에 붙여넣기</b><p>ChatGPT · Claude · Gemini 아무 곳이나.</p></li>
+        <li><b>답 전체 복사 → 메뉴 <span class="kbd">4</span></b><p>검사해서 받아들이고 다음 AI 단계 앞까지 진행합니다. 답 앞뒤의 설명이나 코드블록 표시는 알아서 뗍니다. 형식이 틀리면 재요청 프롬프트를 만들어 주니 다시 3번부터.</p></li>
+        <li><b>3 · 4를 한두 번 더</b><p>공고 분석 → 자소서 초안 → (검사에 걸리면) 수정. 공고 하나에 2~3번입니다.</p></li>
+        <li><b>결과 보기</b><p><code>output/&lt;공고&gt;/report.md</code>와 <code>dashboard.xlsx</code>. 다음 할 일은 메뉴 <span class="kbd">8</span>.</p></li>
+      </ol>
+      <div class="note warn">공고를 못 받는 사이트(화면을 스크립트로 그리는 곳, 로그인이 필요한 곳, 그림 공고)는 브라우저에서 본문을 복사해 메뉴 <span class="kbd">5</span>로 붙여 넣습니다.</div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="p-agent" aria-labelledby="t-agent" hidden>
+      <div class="grid c2">
+        <div class="card">
+          <h3>Claude Code</h3>
+          <ol class="steps">
+            <li><b>폴더 열기 → 신뢰</b><p>처음 열 때 나오는 폴더 신뢰 창에서 신뢰를 골라야 <code>uv run jobfit</code> 실행과 답 파일 쓰기가 허락 없이 됩니다.</p></li>
+            <li><b>말하기</b><p>"이 링크 공고 처리해줘: https://…"</p></li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>Codex</h3>
+          <ol class="steps">
+            <li><b>폴더에서 열기</b><p>Codex는 <code>AGENTS.md</code>를 바로 읽습니다.</p></li>
+            <li><b>말하기</b><p>같은 말로 요청합니다. 샌드박스에서 uv 캐시 오류가 나면 에이전트가 작업 폴더 안 캐시로 돌려 실행합니다.</p></li>
+          </ol>
+        </div>
+      </div>
+      <p style="margin-top:20px">에이전트는 <code>AGENTS.md</code>대로 <code>uv run jobfit</code> 명령만 쓰고, 프롬프트 파일만 읽고, 답 파일만 씁니다. <code>me/</code>와 공고 원문은 읽지 않고, Notion에는 요청할 때만 올립니다.</p>
+      <div class="note">Claude Code와 Codex 둘 다 "새 공고 처리해줘" 한 마디로 실제 공고 1건(문항 3개)을 분석 → 매칭 → 초안 → report.md까지 처리하고, 금지 파일을 한 번도 읽지 않는 것을 실행 로그로 확인했습니다.</div>
+    </div>
+  </div>
+</section>
+
+<section id="result">
+  <div class="wrap">
+    <h2>결과는 이렇게 나옵니다</h2>
+    <p class="sub"><code>report.md</code>의 모양을 보여 주려고 가상의 공고로 줄여 만든 예시입니다. 점수와 문장은 실제 실행 결과가 아닙니다.</p>
+    <div class="doc">
+      <div class="bar"><i></i><i></i><i></i>output/jobkorea-10000002/report.md</div>
+      <div class="body">
+        <h4># 예시컴퍼니 — Node.js개발자(신입)</h4>
+        <p>공고키 jobkorea:10000002 · 마감 2026-11-15 (D-17)</p>
+        <h4>## 매칭</h4>
+        <p><b>점수 64/100</b> · 필수 3/4 · 우대 2/5 · 키워드 6/15</p>
+        <ul>
+          <li>문항별 사용 경험 — q2 목표와 실행 · 문제해결 · 주력: 주문 조회 API 응답 시간 개선</li>
+        </ul>
+        <h4>## 이력서 강조 포인트</h4>
+        <ul>
+          <li>위로 올릴 항목 — [프로젝트] 주문 조회 API 응답 시간 개선: 필수 "서버 API와 데이터베이스", 키워드 Redis</li>
+          <li>공고 표기로 맞출 것 — '스프링부트' → 'Spring Boot'</li>
+        </ul>
+        <h4>## 자기소개서 문항 · ### 2. 목표와 실행</h4>
+        <p>글자수 686자 (공백 포함) · 공고추출 · <span class="mark-warn">확인 필요 1</span></p>
+        <p>… 주문 1건당 21회였던 DB 쿼리를 1회로 줄였고, p95 응답 시간은 1.8초에서 0.4초가 됐습니다. 같은 방식을 <span class="hl">[확인 필요: 적용한 다른 API 수]</span>곳에 더 적용했습니다 …</p>
+        <h4>## 확인 필요</h4>
+        <ul>
+          <li>초안의 [확인 필요] 1곳 — 사실을 채우거나 문장을 빼세요</li>
+          <li>초안은 그대로 내지 말고 내 말투로 다시 다듬으세요</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:14px;color:var(--muted)">검사에서 걸린 곳은 문항 아래에 <span class="mark-bad">⛔ 오류</span> · <span class="mark-warn">⚠ 경고</span>로 붙습니다. 예: <code>'78%'는 경험 카드 facts에 없는 숫자입니다</code>. 오류는 AI에게 한 번 고치게 하고, 그래도 남으면 ⛔로 남겨 직접 고치게 합니다.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>자주 묻는 질문</h2>
+    <p class="sub">더 자세한 설계와 결정 이유는 <a href="https://github.com/donasman/jobfit/blob/main/docs/SPEC.md">docs/SPEC.md</a>에 있습니다.</p>
+    <details><summary>초안을 그대로 내도 되나요?</summary><p>아니요. 초안은 출발점입니다. <code>[확인 필요]</code> 자리를 채우거나 문장을 빼고, 내 말투로 다시 다듬어서 내세요. report에도 그렇게 적혀 나옵니다.</p></details>
+    <details><summary>어떤 채용 사이트를 지원하나요?</summary><p>사람인과 잡코리아는 상세요강까지 자동으로 받습니다. 원티드처럼 화면을 스크립트로 그리는 사이트, 그림 · PDF 공고, 회사 자체 채용 페이지 일부는 본문을 복사해 붙여 넣으면 됩니다. 사이트 이용약관을 확인하고 개인 용도로만 쓰세요.</p></details>
+    <details><summary>매칭 점수는 얼마나 믿을 만한가요?</summary><p>경험 카드 태그와 공고 낱말을 맞춘 참고치입니다. 태그를 공고에 나오는 표기(예: Spring Boot, PostgreSQL)로 적을수록 의미가 커집니다. 기술 낱말이 없는 항목("피드백을 받아들이는 태도")은 점수에서 빼고 몇 개인지만 알려 줍니다.</p></details>
+    <details><summary>공고에 자소서 문항이 없으면요?</summary><p>지어내지 않습니다. 공고 분석 · 매칭 · 이력서 강조 포인트까지가 결과이고, 문항이 있으면 <code>jobs.xlsx</code> 문항 시트에 직접 입력하면 초안 단계로 이어집니다.</p></details>
+    <details><summary>AI 사용량은 얼마나 드나요?</summary><p>공고 1건에 AI 왕복 2~3번입니다. 프롬프트는 공고 분석이 4천 자 안팎, 초안이 3천~8천 자입니다. 같은 공고 · 같은 경험 카드로 다시 돌리면 AI 단계를 건너뜁니다.</p></details>
+    <details><summary>Notion에서 보고 싶어요.</summary><p><code>uv run jobfit export notion</code>이 공고 목록 CSV를 만들고, 공고별 <code>report.md</code>는 Notion '가져오기'에서 마크다운으로 가져오면 됩니다. 에이전트 모드라면 Notion 커넥터로 올려 달라고 요청할 수도 있습니다.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>jobfit v0.1.0 · MIT License</span>
+    <nav>
+      <a href="https://github.com/donasman/jobfit">GitHub</a>
+      <a href="https://github.com/donasman/jobfit#readme">README</a>
+      <a href="https://github.com/donasman/jobfit/blob/main/CHANGELOG.md">변경 기록</a>
+      <a href="https://github.com/donasman/jobfit/releases">릴리스</a>
+      <a href="https://github.com/donasman/jobfit/issues">문의 · 버그</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+// 사용법 탭
+const tabs = document.querySelectorAll('[role="tab"]');
+tabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    tabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  });
+});
+// 명령 복사
+document.querySelectorAll('.code button.copy').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const text = btn.parentElement.querySelector('pre').innerText;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = '복사됨';
+    } catch (e) {
+      btn.textContent = '직접 선택해 복사';
+    }
+    setTimeout(() => { btn.textContent = '복사'; }, 1600);
+  });
+});
+</script>
+</body>
+</html>
