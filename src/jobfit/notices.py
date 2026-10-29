@@ -14,6 +14,9 @@ from jobfit.experiences import check_cards, example_ids, load_cards
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
 from jobfit.match import cards_in_use, load_match
 from jobfit.paths import Project
+from jobfit.profile import example_note as profile_example_note
+from jobfit.profile import load_profile
+from jobfit.profile import split_examples as profile_split_examples
 from jobfit.state import STATUS_ERROR, State
 
 HEADER = "[사용자에게 전할 것] 에이전트는 아래 줄을 요약하지 말고 빠짐없이 그대로 사용자에게 전하세요 — 사람이 직접 해야 하는 일입니다"
@@ -46,6 +49,10 @@ def collect(project: Project, state: State | None = None) -> list[str]:
     resume_note = example_note(resume, split_examples(resume, project.me_example_dir / "resume.yaml")[1])
     if resume_note:
         out.append(resume_note)
+    prof, _ = load_profile(project.profile_file)
+    prof_note = profile_example_note(prof, profile_split_examples(prof, project.me_example_dir / "profile.yaml")[1])
+    if prof_note:
+        out.append(prof_note)
 
     files = exp_extract.source_files(project)
     ai_unverified = [str(c.get("id")) for c in cards if c.get("source") and c.get("verified") is not True]

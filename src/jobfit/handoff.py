@@ -48,7 +48,7 @@ def build(project: Project, state: State, did: str = "") -> Handoff:
 def _todo(action: pipeline.Action) -> str:
     job = action.job
     if job is None:
-        return "경험 카드 만들기"
+        return "지원서 정보 만들기" if "profile" in action.command else "경험 카드 만들기"
     pending = [s for s in STEPS if not job.step_done(s)]
     if action.kind == "ai" and pending:
         return f"{job.company} {STEP_NAMES.get(pending[0], pending[0])}"

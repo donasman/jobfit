@@ -15,12 +15,14 @@ from pathlib import Path
 
 from jobfit.ai.analyze import Prepared
 from jobfit.ai.promptfile import LIMITS, load_template, log_usage, render, sha1
+from jobfit.apply import is_blind
 from jobfit.clean.keywords import KeywordDict
 from jobfit.drafts import DRAFTS_DIR, FILE_LINT, load_drafts
 from jobfit.experiences import file_sha, is_verified, load_cards
 from jobfit.lint import QuestionLint, lint_answer
 from jobfit.match import load_analysis, load_match
 from jobfit.paths import Project
+from jobfit.profile import load_profile, school_names
 from jobfit.report import write_report
 from jobfit.state import Job, now
 from jobfit.style import forbidden_expressions, load_rules, load_stats, stats_lines
@@ -231,6 +233,8 @@ def lint_all(project: Project, job: Job, answers: dict[str, str]) -> list[Questi
     stats = load_stats(project.me_dir)
     kd = KeywordDict.load(project.data_dir)
     versions = [v for alts in kd.variants.values() for v in alts if re.fullmatch(r"[A-Za-z][A-Za-z0-9.+# -]*", v)]
+    # 블라인드 채용 공고면 학교명·나이·가족 직업을 본다 — 내 학교 이름은 지원서 정보(profile.yaml)에서
+    blind = school_names(load_profile(project.profile_file)[0]) if is_blind(project, job) else None
     out = []
     for q in questions:
         if q["id"] not in answers:
@@ -239,7 +243,7 @@ def lint_all(project: Project, job: Job, answers: dict[str, str]) -> list[Questi
         facts = [str(f) for card in picked for f in (card.get("facts") or [])]
         unverified = [str(f) for card in picked if not is_verified(card) for f in (card.get("facts") or [])]
         periods = [str(card.get("period")) for card in picked if card.get("period")]
-        out.append(lint_answer(q["id"], answers[q["id"]], q.get("limit"), q.get("count_spaces", True), facts, q["text"], periods, forbidden, stats, versions, unverified))
+        out.append(lint_answer(q["id"], answers[q["id"]], q.get("limit"), q.get("count_spaces", True), facts, q["text"], periods, forbidden, stats, versions, unverified, blind))
     return out
 
 

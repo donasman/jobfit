@@ -1,0 +1,39 @@
+# 지원서 정보 — 지원서의 학력·경력·자격증·어학·병역·교육·수상·활동 칸을 채울 때 쓴다 (jobfit apply sheet).
+# 이 파일은 예시다. `jobfit init`이 me/ 로 복사한 뒤, 내 정보로 바꿔 쓴다(또는 지원서 정보 만들기로 sources/ 의 이력서에서 뽑는다).
+#
+# 규칙
+# - 이름·연락처·주소·생년월일 같은 신원 정보는 넣지 않는다 — 지원서 화면에서 직접 입력한다.
+# - 항목 하나 = '- section: …' 한 덩어리. section 은 학력·경력·자격증·어학·병역·교육·수상·활동 중 하나.
+# - 날짜는 2025-06-13 또는 2025-06, 기간은 2018-03 ~ 2024-02 꼴. 모르는 칸은 "" 로 둔다.
+# - 사실을 확인한 항목은 verified: true. 아니면 입력표에 [확인 전]으로 나온다.
+
+- section: 학력
+  school: 예시대학교
+  major: 컴퓨터공학과
+  degree: 학사          # 고졸 · 전문학사 · 학사 · 석사 · 박사
+  period: 2019-03 ~ 2025-02
+  status: 졸업          # 졸업 · 졸업예정 · 재학 · 휴학 · 중퇴
+  gpa: 3.7/4.5
+  verified: true
+
+- section: 자격증
+  name: 정보처리기사
+  issuer: 한국산업인력공단
+  date: 2024-12-06
+  number: ""
+  verified: true
+
+- section: 어학
+  test: TOEIC
+  score: "860"
+  grade: ""
+  date: 2025-01-12
+  verified: true
+
+- section: 교육
+  name: 예시 백엔드 개발자 과정
+  institution: 예시 교육센터
+  period: 2025-03 ~ 2025-08
+  hours: "960"
+  content: Java·Spring Boot 기반 웹 서비스 개발, 팀 프로젝트 2회
+  verified: true

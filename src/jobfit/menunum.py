@@ -6,10 +6,11 @@ RUN = 3  # 공고 처리 진행
 POSTING = 4  # 공고 본문 붙여넣기
 NEXT = 5  # 다음 할 일 보기
 OUTPUT = 6  # 결과 폴더 열기
-ME = 7  # 경험 카드 · 문체
-CHECK = 8  # jobs.xlsx 검사
-PROMPT = 9  # AI 프롬프트 복사 (웹 채팅)
-ANSWER = 10  # AI 답 붙여넣기 (웹 채팅)
+SHEET = 7  # 지원서 입력표
+ME = 8  # 내 자료 (경험 카드 · 지원서 정보 · 문체)
+CHECK = 9  # jobs.xlsx 검사
+PROMPT = 10  # AI 프롬프트 복사 (웹 채팅)
+ANSWER = 11  # AI 답 붙여넣기 (웹 채팅)
 
 
 def at(number: int, name: str) -> str:

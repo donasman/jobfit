@@ -442,10 +442,10 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
         <div>
           <p>경험 카드는 <code>me/experiences.yaml</code>에 경험 하나당 하나씩 들어갑니다. 가장 중요한 건 <b>facts</b> — 확정한 수치와 사실만. 초안에 나오는 숫자는 전부 여기 있어야 합니다. 처음 들어 있는 예시 카드 두 개는 지웁니다.</p>
           <ol class="steps" style="margin-top:18px">
-            <li><b>자료 넣기</b><p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code>에. 메뉴 <span class="kbd">7</span> → <span class="kbd">1</span>로 폴더가 열립니다.</p></li>
-            <li><b>메뉴 <span class="kbd">7</span> → <span class="kbd">7</span> → 웹 채팅에 붙여넣기</b><p>답 전체를 복사해 <span class="kbd">7</span> → <span class="kbd">8</span>. 자료가 길면 조각으로 나뉘니 끝날 때까지 반복합니다.</p></li>
-            <li><b>확인하기</b><p><span class="kbd">7</span> → <span class="kbd">3</span>으로 검사하고, 사실이 맞는 카드는 <code>verified: true</code>로 바꿉니다. 직접 쓰려면 <span class="kbd">7</span> → <span class="kbd">4</span>로 빈 카드를 추가합니다.</p></li>
-            <li><b>(선택) 이력서 · 문체</b><p><code>me/resume.yaml</code>에 이력서 항목을, <code>me/samples/</code>에 내가 쓴 자소서를 넣으면 이력서 강조 포인트와 문체 맞추기가 더해집니다.</p></li>
+            <li><b>자료 넣기</b><p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code>에. 메뉴 <span class="kbd">8</span> → <span class="kbd">1</span>로 폴더가 열립니다.</p></li>
+            <li><b>메뉴 <span class="kbd">8</span> → <span class="kbd">2</span> → 메뉴 <span class="kbd">10</span> → 웹 채팅에 붙여넣기</b><p>답 전체를 복사해 메뉴 <span class="kbd">11</span>. 자료가 길면 조각으로 나뉘니 끝날 때까지 반복합니다.</p></li>
+            <li><b>확인하기</b><p><span class="kbd">8</span> → <span class="kbd">3</span>으로 검사하고, 사실이 맞는 카드는 <code>verified: true</code>로 바꿉니다. 직접 쓰려면 <span class="kbd">8</span> → <span class="kbd">4</span>로 빈 카드를 추가합니다.</p></li>
+            <li><b>(선택) 지원서 정보 · 이력서 · 문체</b><p>메뉴 <span class="kbd">8</span> → <span class="kbd">5</span>로 이력서에서 학력 · 자격증 · 어학을 뽑아 두면 메뉴 <span class="kbd">7</span> 지원서 입력표에 들어갑니다(신원 정보는 넣지 않음). <code>me/resume.yaml</code>에 이력서 항목을, <code>me/samples/</code>에 내가 쓴 자소서를 넣으면 이력서 강조 포인트와 문체 맞추기가 더해집니다.</p></li>
           </ol>
         </div>
         <div class="code"><span class="label">me/experiences.yaml</span><pre><code><span class="c-key">- id:</span> exp-order-api
@@ -470,9 +470,9 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
       <ol class="steps">
         <li><b>메뉴 <span class="kbd">1</span> 공고 추가</b><p>링크를 넣으면 회사명 · 직무 · 마감일을 페이지에서 읽어 <code>jobs.xlsx</code>에 넣습니다. 엑셀로 공고 시트에 직접 적어도 됩니다.</p></li>
         <li><b>메뉴 <span class="kbd">3</span> 공고 처리 진행</b><p>공고를 받아 정리하고 AI 단계 앞에서 멈춥니다. 자소서 문항은 메뉴 <span class="kbd">2</span>로 넣습니다.</p></li>
-        <li><b>메뉴 <span class="kbd">9</span> 프롬프트 복사 → 웹 채팅에 붙여넣기</b><p>ChatGPT · Claude · Gemini 아무 곳이나.</p></li>
-        <li><b>답 전체 복사 → 메뉴 <span class="kbd">10</span></b><p>검사해서 받아들이고 다음 AI 단계 앞까지 진행합니다. 답 앞뒤의 설명이나 코드블록 표시는 알아서 뗍니다. 형식이 틀리면 재요청 프롬프트를 만들어 주니 다시 9번부터.</p></li>
-        <li><b>9 · 10을 한두 번 더</b><p>공고 분석 → 자소서 초안 → (검사에 걸리면) 수정. 공고 하나에 2~3번입니다.</p></li>
+        <li><b>메뉴 <span class="kbd">10</span> 프롬프트 복사 → 웹 채팅에 붙여넣기</b><p>ChatGPT · Claude · Gemini 아무 곳이나.</p></li>
+        <li><b>답 전체 복사 → 메뉴 <span class="kbd">11</span></b><p>검사해서 받아들이고 다음 AI 단계 앞까지 진행합니다. 답 앞뒤의 설명이나 코드블록 표시는 알아서 뗍니다. 형식이 틀리면 재요청 프롬프트를 만들어 주니 다시 10번부터.</p></li>
+        <li><b>10 · 11을 한두 번 더</b><p>공고 분석 → 자소서 초안 → (검사에 걸리면) 수정. 공고 하나에 2~3번입니다.</p></li>
         <li><b>결과 보기</b><p><code>output/&lt;공고&gt;/report.md</code>와 <code>dashboard.xlsx</code>. 다음 할 일은 메뉴 <span class="kbd">5</span>.</p></li>
       </ol>
       <div class="note warn">공고를 못 받는 사이트(화면을 스크립트로 그리는 곳, 로그인이 필요한 곳, 그림 공고)는 브라우저에서 본문을 복사해 메뉴 <span class="kbd">4</span>로 붙여 넣습니다.</div>

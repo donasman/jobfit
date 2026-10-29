@@ -289,13 +289,17 @@ def source_files(project: Project) -> dict[str, dict]:
 
 
 def parse_cards(text: str) -> list:
-    """답에서 카드 목록을 꺼낸다. 코드 블록이 있으면 그 안만, 없으면 첫 '- ' 줄부터 맨 앞 칸의 설명 문장 직전까지."""
+    return parse_yaml_list(text, "- id: …")
+
+
+def parse_yaml_list(text: str, first_line: str) -> list:
+    """답에서 YAML 목록을 꺼낸다. 코드 블록이 있으면 그 안만, 없으면 첫 '- ' 줄부터 맨 앞 칸의 설명 문장 직전까지."""
     fenced = _FENCED.search(text)
     body = fenced.group(1) if fenced else _FENCE_LINE.sub("", text)
     lines = body.strip().splitlines()
     start = next((i for i, ln in enumerate(lines) if ln.lstrip().startswith(("- ", "-\t", "[")) or ln.strip() == "-"), None)
     if start is None:
-        raise ValueError("답에서 YAML 목록('- id: …')을 찾지 못했습니다. 답 형식 그대로 다시 요청하세요")
+        raise ValueError(f"답에서 YAML 목록('{first_line}')을 찾지 못했습니다. 답 형식 그대로 다시 요청하세요")
     end = next(
         (i for i in range(start + 1, len(lines)) if lines[i].strip() and not lines[i][0].isspace() and not lines[i].startswith(("-", "#", "]"))),
         len(lines),
@@ -309,7 +313,7 @@ def parse_cards(text: str) -> list:
     if data is None:
         return []
     if not isinstance(data, list):
-        raise ValueError("답이 카드 목록이 아닙니다(맨 앞이 '- '로 시작해야 합니다)")
+        raise ValueError("답이 목록이 아닙니다(맨 앞이 '- '로 시작해야 합니다)")
     return data
 
 

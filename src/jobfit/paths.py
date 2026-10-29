@@ -103,6 +103,20 @@ class Project:
         return self.me_dir / "resume.yaml"
 
     @property
+    def profile_file(self) -> Path:
+        """지원서 정보(학력·자격증·어학 …). 신원 정보는 넣지 않는다."""
+        return self.me_dir / "profile.yaml"
+
+    @property
+    def profile_dir(self) -> Path:
+        """지원서 정보 뽑기 프롬프트·답(output/_profile/_ai) — exp_dir 과 같은 꼴."""
+        return self.output_dir / "_profile" / "_ai"
+
+    def apply_dir(self, key: str) -> Path:
+        """지원서 입력표(output/<공고>/apply)."""
+        return self.job_dir(key) / "apply"
+
+    @property
     def sources_dir(self) -> Path:
         """경험 카드를 뽑을 내 자료(이력서·포트폴리오·프로젝트 문서). me/ 밖이라 에이전트가 읽을 수 있다."""
         return self.root / "sources"

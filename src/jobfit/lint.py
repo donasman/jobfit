@@ -16,6 +16,12 @@ from jobfit.style import MIN_SAMPLES_FOR_LINT, SPECIAL_CHARS, split_sentences
 
 NO_LIMIT_RANGE = (500, 1000)  # 글자수 제한이 없을 때 프롬프트는 600~900자를 요청한다
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# 블라인드 채용에서 쓰면 안 되는 인적사항(학교명·나이·가족 직업). 학교명은 내 학교 말고도 '○○대학교' 꼴을 본다
+_BLIND_PATTERNS = [
+    ("학교명", re.compile(r"[가-힣A-Za-z]{2,}(?:대학교|대학원|고등학교)")),
+    ("나이", re.compile(r"(?<![\d.])\d{2}\s?(?:살|세)(?=[\s,.)]|$|에|의|인|이|가|로|부터|까지|때)")),
+    ("가족의 직업", re.compile(r"(?:아버지|어머니|부모님|아버님|어머님)(?:께서|의|가|는|이)?\s?(?:직업|회사|직장|근무|사업|운영)")),
+]
 _PHONE = re.compile(r"(?<!\d)0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)")
 _CONFIRM = re.compile(r"\[확인\s*필요[^\]]*\]")
 _YEAR = re.compile(r"(?:19|20)\d{2}")
@@ -70,9 +76,11 @@ def lint_answer(
     stats: dict | None = None,
     version_names: list[str] | None = None,
     unverified_facts: list[str] | None = None,
+    blind_words: list[str] | None = None,
 ) -> QuestionLint:
     """allowed_text: 숫자가 들어 있어도 되는 다른 글(문항 원문 등).
-    unverified_facts: facts 중 verified가 아닌 카드의 것 — 그 숫자만 쓰면 경고."""
+    unverified_facts: facts 중 verified가 아닌 카드의 것 — 그 숫자만 쓰면 경고.
+    blind_words: 블라인드 채용 공고일 때 내 학교 이름들(없어도 [] 를 주면 일반 학교명·나이·가족 직업을 본다). None 이면 보지 않는다."""
     body = text.strip()
     result = QuestionLint(
         qid=qid,
@@ -128,6 +136,16 @@ def lint_answer(
     # 연락처
     if _EMAIL.search(body) or _PHONE.search(body):
         add("오류", "contact", "이메일·전화번호가 들어 있습니다")
+
+    # 블라인드 채용 — 학교명·나이·가족 직업. 경고로(공고마다 기준이 조금씩 다르다)
+    if blind_words is not None:
+        for word in blind_words:
+            if word and word in body:
+                add("경고", "blind", f"블라인드 채용 공고입니다 — 학교명 '{word}'을(를) 쓰지 마세요")
+        for kind, pattern in _BLIND_PATTERNS:
+            for m in pattern.finditer(body):
+                if not any(w and w in m.group(0) for w in blind_words):
+                    add("경고", "blind", f"블라인드 채용 공고입니다 — '{m.group(0)}' 같은 표현({kind})은 빼세요")
 
     # 금지 표현
     for expr in forbidden or []:

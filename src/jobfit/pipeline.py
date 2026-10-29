@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from jobfit import jobkey, menunum
-from jobfit.ai import analyze, draft, exp_extract
+from jobfit.ai import analyze, draft, exp_extract, profile_extract
 from jobfit.clean.posting import FILE_POSTING, clean_job
 from jobfit.dashboard import DashboardBusy, build_dashboard
 from jobfit.excel.reader import JobRow, QuestionRow, ReadResult, read_jobs_workbook
@@ -322,10 +322,13 @@ def next_action(project: Project, state: State) -> Action:
     if not project.is_initialized():
         return Action(kind="run", message="처음 설정이 필요합니다", command="jobfit init")
     # 경험 카드가 매칭에 쓰이므로, 같은 급이면 자료 → 공고 순서로 안내한다
-    exp = _exp_action(project)
+    exp, prof = _exp_action(project), _profile_action(project)
     if not state.jobs:
-        return exp or Action(kind="edit", message=f'jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>"(메뉴 {menunum.ADD})로 추가한 뒤 jobfit run(메뉴 {menunum.RUN})', command="jobfit run")
-    actions = ([exp] if exp else []) + [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
+        mine = [a for a in (exp, prof) if a]
+        return min(mine, key=lambda a: _PRIORITY[a.kind]) if mine else Action(kind="edit", message=f'jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>"(메뉴 {menunum.ADD})로 추가한 뒤 jobfit run(메뉴 {menunum.RUN})', command="jobfit run")
+    # 경험 카드는 매칭에 쓰여 공고보다 먼저, 지원서 정보는 입력표에만 쓰여 공고 뒤에
+    jobs = [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
+    actions = ([exp] if exp else []) + jobs + ([prof] if prof else [])
     if actions:
         return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 앞의 것(자료, 그다음 jobs.xlsx 위쪽 공고)
     return Action(kind="done", message="처리할 공고가 없습니다. 새 공고를 jobs.xlsx에 적거나 결정을 미정으로 돌리세요", command="jobfit sync-in")
@@ -348,6 +351,21 @@ def _exp_action(project: Project) -> Action | None:
     if new:
         return Action(kind="run", message=f"sources/ 에 새 자료 {len(new)}개 — 경험 카드로 만들려면", command="jobfit exp extract")
     return None
+
+
+def _profile_action(project: Project) -> Action | None:
+    """지원서 정보 뽑기는 사용자가 profile extract 를 한 뒤에만 — 프롬프트가 있을 때만 안내한다."""
+    items = profile_extract.pending_items(project)
+    if not items:
+        return None
+    item = items[0]
+    part = f" 조각 {item.part}/{item.parts}" if item.parts > 1 else ""
+    message = (
+        f"지원서 정보 뽑기: {item.source}{part} — AI 단계입니다.\n"
+        f"  붙여넣기 모드: jobfit prep --copy → 웹 채팅에 붙여넣기 → 답 전체 복사 → jobfit accept --paste\n"
+        f"  에이전트 모드: {project.rel(item.prompt)} 를 읽고 답을 {project.rel(item.response)} 에 쓴 뒤 jobfit accept profile-extract"
+    )
+    return Action(kind="ai", message=message, command="jobfit prep profile-extract --copy")
 
 
 # 사용자가 손을 써야 하는 것 → AI 단계 → 스크립트로 진행 → 다음 버전 → 문항 입력 대기

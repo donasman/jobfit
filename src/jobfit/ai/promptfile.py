@@ -10,7 +10,7 @@ from jobfit.paths import Project
 from jobfit.state import now
 
 # 프롬프트 글자수 상한(SPEC §5). 넘으면 경고하고 줄일 대상을 알려 준다
-LIMITS = {"analyze": 6000, "draft": 8000, "revise": 6000, "style-rules": 6000, "exp-extract": 8000}
+LIMITS = {"analyze": 6000, "draft": 8000, "revise": 6000, "style-rules": 6000, "exp-extract": 8000, "profile-extract": 8000}
 TAGS_MAX_CHARS = 600  # 프롬프트에 넣는 태그 목록 최대 글자수 — 카드가 늘어도 프롬프트가 끝없이 길어지지 않게
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")

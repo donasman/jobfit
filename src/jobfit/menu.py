@@ -37,34 +37,38 @@ MAIN_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
         (M.POSTING, "공고 본문 붙여넣기", "받기에 실패한 공고"),
         (M.NEXT, "다음 할 일 보기", "에이전트에게 보낼 말도 함께"),
         (M.OUTPUT, "결과 폴더 열기", "공고별 report.md"),
+        (M.SHEET, "지원서 입력표", "학력·자격증·자소서를 한 장으로"),
     ]),
     ("내 자료", [
-        (M.ME, "경험 카드 · 문체  ›", ""),
+        (M.ME, "내 자료 관리  ›", "경험 카드 · 지원서 정보 · 문체"),
         (M.CHECK, "jobs.xlsx 검사", ""),
     ]),
     ("웹 채팅에 직접 붙여넣기 (에이전트 없이)", [
         (M.PROMPT, "AI 프롬프트 복사", "클립보드로"),
-        (M.ANSWER, "AI 답 붙여넣기", "클립보드의 답을 저장·검사하고 이어서 진행"),
+        (M.ANSWER, "AI 답 붙여넣기", "저장·검사하고 이어서 진행"),
     ]),
 ]
 ME_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
     ("경험 카드", [
         (1, "sources 폴더 열기", "이력서·포트폴리오를 넣는 곳"),
-        (2, "새 자료 확인", "sources 를 읽어 경험 카드 만들기 준비"),
+        (2, "경험 카드 만들기 준비", "sources 를 읽어 AI 단계 직전까지"),
         (3, "경험 카드 검사", ""),
         (4, "빈 경험 카드 추가", ""),
-        (5, "me 폴더 열기", ""),
+    ]),
+    ("지원서 정보 (학력·경력·자격증·어학 …)", [
+        (5, "지원서 정보 만들기 준비", "이력서를 읽어 AI 단계 직전까지"),
+        (6, "지원서 정보 검사", ""),
     ]),
     ("문체", [
-        (6, "문체 수치 계산", "me/samples 의 내 자소서"),
+        (7, "문체 수치 계산", "me/samples 의 내 자소서"),
+        (8, "문체 규칙: 프롬프트 복사", "웹 채팅용"),
+        (9, "문체 규칙: 답 붙여넣기", "웹 채팅용"),
     ]),
-    ("웹 채팅에 직접 붙여넣기 (에이전트 없이)", [
-        (7, "경험 카드: 프롬프트 복사", ""),
-        (8, "경험 카드: 답 붙여넣기", ""),
-        (9, "문체 규칙: 프롬프트 복사", ""),
-        (10, "문체 규칙: 답 붙여넣기", ""),
+    ("", [
+        (10, "me 폴더 열기", ""),
     ]),
 ]
+ME_NOTE = f"웹 채팅에서는 경험 카드·지원서 정보 프롬프트도\n메인 메뉴 {M.PROMPT}번(복사)·{M.ANSWER}번(붙여넣기)으로"
 STYLE_AGENT = (
     "me/samples 의 내 자소서로 문체 수치를 계산했어. `uv run jobfit prep style-rules`로 문체 규칙 프롬프트를 만들고, "
     "그 프롬프트대로 답을 쓴 뒤 `uv run jobfit accept style-rules`까지 해줘."
@@ -104,15 +108,15 @@ class _Menu:
             self.console.rule(style="dim")
             self._main(choice)
 
-    def _draw(self, menu, title: str, subtitle: str, zero: str) -> None:
+    def _draw(self, menu, title: str, subtitle: str, zero: str, note: str = "") -> None:
         # 구역마다 표를 따로 만들되 열 너비를 같게 — 긴 구역 제목이 이름 열을 넓히지 않게 제목은 표 밖에 둔다
         name_width = max(cell_len(name) for _, items in menu for _, name, _ in items)
         parts: list = []
-        for section, items in [*menu, ("", [(0, zero, "")])]:
+        for i, (section, items) in enumerate([*menu, ("", [(0, zero, "")])]):
             if section:
                 parts.append(Text(section, style="bold magenta"))
-            else:
-                parts.append(Text(""))
+            elif i == len(menu):
+                parts.append(Text(""))  # 0(끝내기·돌아가기) 앞 빈 줄
             grid = Table.grid(padding=(0, 2))
             grid.add_column(justify="right", style="bold cyan", width=3)
             grid.add_column(style="bold", width=name_width)
@@ -120,6 +124,8 @@ class _Menu:
             for number, name, desc in items:
                 grid.add_row(str(number), Text(name, style="dim") if number == 0 else name, desc)
             parts.append(grid)
+        if note:
+            parts += [Text(""), Text(note, style="dim")]
         self.console.print()
         self.console.print(Panel(Group(*parts), title=f"[bold]{title}[/]", subtitle=subtitle, subtitle_align="left", border_style="cyan", expand=False))
 
@@ -159,6 +165,7 @@ class _Menu:
             M.POSTING: self._posting,
             M.NEXT: lambda: self._step(["next"], "", "", body=False),
             M.OUTPUT: lambda: _open(self.project.output_dir),
+            M.SHEET: self._sheet,
             M.ME: self._me,
             M.CHECK: lambda: self._step(["check"], "", ""),
             M.PROMPT: lambda: self._call(["prep", "--copy"]),
@@ -171,14 +178,14 @@ class _Menu:
 
     def _me(self) -> None:
         while True:
-            self._draw(ME_MENU, "경험 카드 · 문체", "", "돌아가기")
+            self._draw(ME_MENU, "내 자료", "", "돌아가기", ME_NOTE)
             choice = self._ask_number()
             if choice == 0:
                 return
             self.console.rule(style="dim")
             if choice == 1:
                 _open(self.project.sources_dir)
-                self._hint("자료를 넣은 뒤 2번(새 자료 확인)을 누르면 에이전트에게 보낼 말이 나옵니다")
+                self._hint("자료를 넣은 뒤 2번(경험 카드 만들기 준비)·5번(지원서 정보 만들기 준비)을 누르면 에이전트에게 보낼 말이 나옵니다")
             elif choice == 2:
                 self._step(["exp", "extract"], "자료 읽는 중…", "sources 에 새 자료를 넣었어.")
             elif choice == 3:
@@ -186,19 +193,19 @@ class _Menu:
             elif choice == 4:
                 self._call(["exp", "new"])
             elif choice == 5:
-                _open(self.project.me_dir)
+                self._step(["profile", "extract"], "자료 읽는 중…", "sources 의 이력서로 지원서 정보(학력·자격증·어학 등)를 만들 준비를 해 뒀어.")
             elif choice == 6:
+                self._call(["profile", "check"])
+            elif choice == 7:
                 rc, _ = self._call(["style", "stats"])
                 if rc == 0:
                     self._show_agent(handoff.Handoff(agent=STYLE_AGENT))
-            elif choice == 7:
-                self._call(["exp", "extract", "--copy"])
             elif choice == 8:
-                self._call(["accept", "exp-extract", "--paste"])
-            elif choice == 9:
                 self._call(["prep", "style-rules", "--copy"])
-            elif choice == 10:
+            elif choice == 9:
                 self._call(["accept", "style-rules", "--paste"])
+            elif choice == 10:
+                _open(self.project.me_dir)
 
     def _first_setup(self) -> bool:
         self.console.print(Panel("이 폴더는 아직 처음 설정 전입니다. jobs.xlsx, me/, sources/, output/ 을 만듭니다.", title="처음 설정", border_style="cyan", expand=False))
@@ -269,6 +276,17 @@ class _Menu:
         rc, _ = self._call(["posting", "--job", job.key, "--from-clipboard"])
         if rc == 0:
             self._step(["run"], "공고 처리 중…", f"{job.company} 공고 본문을 넣고 AI 단계 직전까지 진행해 뒀어.")
+
+    def _sheet(self) -> None:
+        state = self._state()
+        job = self._pick(state.active_jobs(), "입력표를 만들 공고")
+        if job is None:
+            return
+        rc, _ = self._call(["apply", "sheet", "--job", job.key])
+        if rc == 0:
+            path = self.project.apply_dir(job.key) / "fill.md"
+            self._hint(f"{self.project.rel(path)} 를 열어 지원서 칸에 옮기세요. 신원 정보는 직접, 제출도 직접 합니다")
+            _open(path)
 
     def _answer(self) -> None:
         rc, _ = self._call(["accept", "--paste"])
@@ -397,11 +415,17 @@ def _styled(line: str) -> Text:
 
 
 def _open(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
+    """폴더는 탐색기로, 글 파일(.md)은 메모장·텍스트 편집기로 — .md 에 연결된 프로그램이 없는 PC가 많다."""
+    is_file = bool(path.suffix)
+    if not is_file:
+        path.mkdir(parents=True, exist_ok=True)
     if sys.platform.startswith("win"):
-        os.startfile(path)  # noqa: S606 — 사용자가 고른 폴더를 탐색기로
+        if is_file:
+            subprocess.Popen(["notepad.exe", str(path)])  # noqa: S603, S607
+        else:
+            os.startfile(path)  # noqa: S606
     elif sys.platform == "darwin":
-        subprocess.run(["open", str(path)], check=False)
+        subprocess.run(["open", "-t", str(path)] if is_file else ["open", str(path)], check=False)
     else:
         subprocess.run(["xdg-open", str(path)], check=False)
 
