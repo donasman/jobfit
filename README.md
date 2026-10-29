@@ -34,7 +34,7 @@
 
 ## 설치
 
-1. [Releases](../../releases)에서 `jobfit-v<버전>.zip`을 받아 원하는 곳에 푼다.
+1. [Releases](../../releases/latest)에서 `jobfit.zip`을 받아 원하는 곳에 푼다.
 2. `start.bat`(macOS는 `./start.sh`)을 실행하고 **1. 처음 설정**. `jobs.xlsx`, `me/`, `sources/`, `output/`이 생긴다.
 
 ## 처음 한 번: 내 정보 넣기 (`me/`)

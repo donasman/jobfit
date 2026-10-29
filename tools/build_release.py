@@ -1,4 +1,4 @@
-"""배포용 zip 만들기 — dist/jobfit-v<버전>.zip. 사용자에게 필요한 파일만 넣는다(테스트·개발 파일 제외).
+"""배포용 zip 만들기 — dist/jobfit.zip (이름에 버전이 없어 releases/latest/download/jobfit.zip 링크가 늘 최신을 가리킨다). 사용자에게 필요한 파일만 넣는다(테스트·개발 파일 제외).
 
 uv run python tools/build_release.py
 """
@@ -6,7 +6,6 @@ uv run python tools/build_release.py
 from __future__ import annotations
 
 import sys
-import tomllib
 import zipfile
 from pathlib import Path
 
@@ -33,8 +32,7 @@ SKIP_PARTS = {"__pycache__", ".pytest_cache"}
 
 
 def main() -> int:
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    out = ROOT / "dist" / f"jobfit-v{version}.zip"
+    out = ROOT / "dist" / "jobfit.zip"  # 버전은 릴리스 태그와 CHANGELOG에
     out.parent.mkdir(exist_ok=True)
     files: list[Path] = []
     for item in INCLUDE:
