@@ -103,6 +103,16 @@ class Project:
         return self.me_dir / "resume.yaml"
 
     @property
+    def sources_dir(self) -> Path:
+        """경험 카드를 뽑을 내 자료(이력서·포트폴리오·프로젝트 문서). me/ 밖이라 에이전트가 읽을 수 있다."""
+        return self.root / "sources"
+
+    @property
+    def exp_dir(self) -> Path:
+        """경험 카드 뽑기 프롬프트·답(output/_exp/_ai). 공고별 _ai/ 와 같은 꼴이라 에이전트 쓰기 허용 규칙이 그대로 맞는다."""
+        return self.output_dir / "_exp" / "_ai"
+
+    @property
     def prompts_dir(self) -> Path:
         """프로젝트 루트의 prompts/가 있으면 패키지 템플릿보다 우선한다."""
         local = self.root / "prompts"

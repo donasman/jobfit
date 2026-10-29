@@ -59,9 +59,12 @@ echo [문체 · 경험 카드]
 echo  1. 문체 수치 계산 (me\samples 의 내 자소서)
 echo  2. 문체 규칙 프롬프트 복사 (클립보드)
 echo  3. 문체 규칙 답 붙여넣기 (클립보드)
-echo  4. 경험 카드 검사
-echo  5. 빈 경험 카드 추가
-echo  6. me 폴더 열기
+echo  4. 경험 카드 만들기: 프롬프트 복사 (sources 폴더의 내 자료로)
+echo  5. 경험 카드 만들기: AI 답 붙여넣기
+echo  6. 경험 카드 검사
+echo  7. 빈 경험 카드 추가
+echo  8. me 폴더 열기
+echo  9. sources 폴더 열기 (이력서·포트폴리오 넣는 곳)
 echo  0. 돌아가기
 set "m="
 set /p "m=번호: "
@@ -69,8 +72,11 @@ if not defined m (set /a empty+=1) else (set empty=0)
 if "%m%"=="1" uv run jobfit style stats
 if "%m%"=="2" uv run jobfit prep style-rules --copy
 if "%m%"=="3" uv run jobfit accept style-rules --paste
-if "%m%"=="4" uv run jobfit exp check
-if "%m%"=="5" uv run jobfit exp new
-if "%m%"=="6" start "" "%~dp0me"
+if "%m%"=="4" uv run jobfit exp extract --copy
+if "%m%"=="5" uv run jobfit accept exp-extract --paste
+if "%m%"=="6" uv run jobfit exp check
+if "%m%"=="7" uv run jobfit exp new
+if "%m%"=="8" start "" "%~dp0me"
+if "%m%"=="9" start "" "%~dp0sources"
 if "%m%"=="0" goto menu
 goto me

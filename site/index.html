@@ -132,6 +132,8 @@ h3 { font-size: 19px; margin: 0 0 8px; }
 }
 .card .icon.ai { background: var(--ai-soft); color: var(--ai); }
 .card .icon svg { width: 22px; height: 22px; }
+.card.wide { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--ai) 45%, var(--line)); }
+.card.wide h3 .badge { vertical-align: 3px; }
 
 /* 흐름도 */
 .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin: 8px 0 24px; }
@@ -150,6 +152,7 @@ h3 { font-size: 19px; margin: 0 0 8px; }
   background: var(--ai); color: #fff; margin-left: 6px; vertical-align: 2px;
 }
 @media (prefers-color-scheme: dark) { .badge { color: #0d1017; } }
+.flow-label { font-weight: 700; font-size: 14px; color: var(--muted); margin: 18px 0 8px; }
 .legend { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
 .legend i.s { background: var(--card); }
@@ -275,11 +278,11 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
 <div class="hero">
   <div class="wrap">
     <h1>채용공고 링크 하나로<br>공고 분석부터 자소서 초안까지</h1>
-    <p class="lead">jobfit은 공고를 받아 정리하고, AI가 공고를 분석해 <strong>내 경험 카드</strong>와 맞춘 뒤 자소서 초안을 씁니다. 그다음 스크립트가 <strong>글자수 · 지어낸 숫자 · 연락처</strong>를 검사해 한 장으로 정리합니다. <strong>스크립트가 보장하고, AI는 판단만 합니다.</strong></p>
+    <p class="lead">jobfit은 공고를 받아 정리하고, AI가 공고를 분석해 <strong>내 경험 카드</strong>와 맞춘 뒤 자소서 초안을 씁니다. 그다음 스크립트가 <strong>글자수 · 지어낸 숫자 · 연락처</strong>를 검사해 한 장으로 정리합니다. 경험 카드도 이력서 · 포트폴리오를 넣으면 AI가 만들어 줍니다. <strong>스크립트가 보장하고, AI는 판단만 합니다.</strong></p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/donasman/jobfit/releases/download/v0.1.0/jobfit-v0.1.0.zip">
+      <a class="btn primary" href="https://github.com/donasman/jobfit/releases/download/v0.2.0/jobfit-v0.2.0.zip">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-        v0.1.0 내려받기 (zip)
+        v0.2.0 내려받기 (zip)
       </a>
       <a class="btn" href="https://github.com/donasman/jobfit">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
@@ -295,6 +298,11 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
     <h2>무엇을 해 주나요</h2>
     <p class="sub">공고 한 건을 넣으면 지원 준비에 필요한 것을 한 장으로 돌려줍니다. 개발 공고처럼 자소서 문항이 없는 공고도 매칭과 이력서 강조 포인트까지는 나옵니다.</p>
     <div class="grid c3">
+      <div class="card wide">
+        <div class="icon ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h4"/></svg></div>
+        <h3>경험 카드 만들기<span class="badge">v0.2 새 기능</span></h3>
+        <p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code> 폴더에 넣으면 AI가 경험 카드를 뽑습니다. docx · hwpx · pptx · xlsx · PDF는 스크립트가 글자를 꺼내고, 그림이나 스캔한 PDF는 AI가 원본을 직접 읽습니다. 받기 전에 스크립트가 <b>카드의 숫자를 자료 원문과 대조해 없는 숫자는 뺍니다.</b> 새 카드는 모두 "확인 전"으로 붙으니, 사실을 확인하고 표시만 바꾸면 됩니다.</p>
+      </div>
       <div class="card">
         <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg></div>
         <h3>공고 받기 · 정리</h3>
@@ -333,6 +341,14 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
   <div class="wrap">
     <h2>작동 방식</h2>
     <p class="sub">AI가 하는 일은 보라색 두세 칸뿐입니다. 나머지는 전부 스크립트가 하고, AI의 답도 스크립트가 검사한 뒤에만 받아들입니다.</p>
+    <p class="flow-label">처음 한 번 — 경험 카드 만들기</p>
+    <div class="flow" role="list">
+      <div class="step" role="listitem"><div class="n">A</div><b>내 자료 넣기</b><span>이력서 · 포트폴리오, 형식 무관</span></div>
+      <div class="step" role="listitem"><div class="n">B</div><b>글자 꺼내기</b><span>전화 · 이메일은 가림</span></div>
+      <div class="step ai" role="listitem"><div class="n">C</div><b>카드 뽑기<span class="badge">AI</span></b><span>자료에 적힌 것만</span></div>
+      <div class="step" role="listitem"><div class="n">D</div><b>원문 대조</b><span>자료에 없는 숫자는 뺌</span></div>
+    </div>
+    <p class="flow-label">공고마다</p>
     <div class="flow" role="list">
       <div class="step" role="listitem"><div class="n">1</div><b>공고 받기 · 정리</b><span>링크 한 건씩, 본문만</span></div>
       <div class="step ai" role="listitem"><div class="n">2</div><b>공고 분석<span class="badge">AI</span></b><span>필수 · 우대 · 키워드 · 문항</span></div>
@@ -356,8 +372,8 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
       <div class="card">
         <h3>내 정보는</h3>
         <ul class="checks">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 컴퓨터에만</b><span>경험 카드 · 이력서 항목 · 자소서 샘플은 <code>me/</code> 폴더에 있고, 저장소나 배포본에 들어가지 않습니다.</span></div></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>AI에는 필요한 만큼만</b><span>문항마다 고른 경험 카드 두 개의 내용과 태그 목록만 넘어갑니다. 공고 속 담당자 연락처는 가려서 넘깁니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 컴퓨터에만</b><span>경험 카드 · 이력서 항목 · 자소서 샘플은 <code>me/</code>, 카드를 뽑을 자료는 <code>sources/</code> 폴더에 있고, 저장소나 배포본에 들어가지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>AI에는 필요한 만큼만</b><span>문항마다 고른 경험 카드 두 개의 내용과 태그 목록만 넘어갑니다. 공고 속 담당자 연락처와 내 자료 속 전화 · 이메일은 가려서 넘깁니다.</span></div></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>크롤러 없음</b><span>내가 적은 링크 한 건씩만 받고 robots.txt를 따릅니다. 사이트를 돌며 긁어 오지 않습니다.</span></div></li>
         </ul>
       </div>
@@ -400,8 +416,8 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
       <div class="card">
         <h3>설치</h3>
         <ol class="steps">
-          <li><b>zip 받아서 풀기</b><p><a href="https://github.com/donasman/jobfit/releases/download/v0.1.0/jobfit-v0.1.0.zip">jobfit-v0.1.0.zip</a>을 원하는 폴더에 풉니다.</p></li>
-          <li><b><code>start.bat</code> 실행 → <span class="kbd">1</span> 처음 설정</b><p>macOS는 <code>./start.sh</code>. <code>jobs.xlsx</code>, <code>me/</code>, <code>output/</code>이 생깁니다.</p></li>
+          <li><b>zip 받아서 풀기</b><p><a href="https://github.com/donasman/jobfit/releases/download/v0.2.0/jobfit-v0.2.0.zip">jobfit-v0.2.0.zip</a>을 원하는 폴더에 풉니다.</p></li>
+          <li><b><code>start.bat</code> 실행 → <span class="kbd">1</span> 처음 설정</b><p>macOS는 <code>./start.sh</code>. <code>jobs.xlsx</code>, <code>me/</code>, <code>sources/</code>, <code>output/</code>이 생깁니다.</p></li>
         </ol>
       </div>
     </div>
@@ -413,7 +429,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
 <section id="usage">
   <div class="wrap">
     <h2>사용법</h2>
-    <p class="sub">처음 한 번 내 경험 카드를 넣고, 그다음부터는 공고마다 링크만 적으면 됩니다.</p>
+    <p class="sub">처음 한 번 내 자료로 경험 카드를 만들고, 그다음부터는 공고마다 링크만 적으면 됩니다.</p>
 
     <div class="tabs" role="tablist" aria-label="사용법">
       <button role="tab" aria-selected="true" aria-controls="p-me" id="t-me">① 내 정보 넣기</button>
@@ -424,10 +440,11 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
     <div class="panel" role="tabpanel" id="p-me" aria-labelledby="t-me">
       <div class="grid c2">
         <div>
-          <p><code>me/experiences.yaml</code>에 경험을 카드 하나씩 적습니다. 처음에는 예시가 들어 있으니 내 경험으로 바꿉니다. 가장 중요한 건 <b>facts</b> — 확정한 수치와 사실만 적습니다. 초안에 나오는 숫자는 전부 여기 있어야 합니다.</p>
+          <p>경험 카드는 <code>me/experiences.yaml</code>에 경험 하나당 하나씩 들어갑니다. 가장 중요한 건 <b>facts</b> — 확정한 수치와 사실만. 초안에 나오는 숫자는 전부 여기 있어야 합니다. 처음 들어 있는 예시 카드 두 개는 지웁니다.</p>
           <ol class="steps" style="margin-top:18px">
-            <li><b>카드 고치기</b><p>메뉴 <span class="kbd">7</span> → <span class="kbd">5</span>로 빈 카드를 추가할 수도 있습니다.</p></li>
-            <li><b>검사하기</b><p>메뉴 <span class="kbd">7</span> → <span class="kbd">4</span>. 빠진 칸, 태그 표기, facts에 없는 숫자를 알려 줍니다.</p></li>
+            <li><b>자료 넣기</b><p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code>에. 메뉴 <span class="kbd">7</span> → <span class="kbd">9</span>로 폴더가 열립니다.</p></li>
+            <li><b>메뉴 <span class="kbd">7</span> → <span class="kbd">4</span> → 웹 채팅에 붙여넣기</b><p>답 전체를 복사해 <span class="kbd">7</span> → <span class="kbd">5</span>. 자료가 길면 조각으로 나뉘니 끝날 때까지 반복합니다.</p></li>
+            <li><b>확인하기</b><p><span class="kbd">7</span> → <span class="kbd">6</span>으로 검사하고, 사실이 맞는 카드는 <code>verified: true</code>로 바꿉니다. 직접 쓰려면 <span class="kbd">7</span> → <span class="kbd">7</span>로 빈 카드를 추가합니다.</p></li>
             <li><b>(선택) 이력서 · 문체</b><p><code>me/resume.yaml</code>에 이력서 항목을, <code>me/samples/</code>에 내가 쓴 자소서를 넣으면 이력서 강조 포인트와 문체 맞추기가 더해집니다.</p></li>
           </ol>
         </div>
@@ -467,7 +484,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
           <h3>Claude Code</h3>
           <ol class="steps">
             <li><b>폴더 열기 → 신뢰</b><p>처음 열 때 나오는 폴더 신뢰 창에서 신뢰를 골라야 <code>uv run jobfit</code> 실행과 답 파일 쓰기가 허락 없이 됩니다.</p></li>
-            <li><b>말하기</b><p>"이 링크 공고 처리해줘: https://…"</p></li>
+            <li><b>말하기</b><p>"sources에 넣은 내 자료로 경험 카드 만들어줘", "이 링크 공고 처리해줘: https://…"</p></li>
           </ol>
         </div>
         <div class="card">
@@ -523,6 +540,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
     <p class="sub">더 자세한 설계와 결정 이유는 <a href="https://github.com/donasman/jobfit/blob/main/docs/SPEC.md">docs/SPEC.md</a>에 있습니다.</p>
     <details><summary>초안을 그대로 내도 되나요?</summary><p>아니요. 초안은 출발점입니다. <code>[확인 필요]</code> 자리를 채우거나 문장을 빼고, 내 말투로 다시 다듬어서 내세요. report에도 그렇게 적혀 나옵니다.</p></details>
     <details><summary>어떤 채용 사이트를 지원하나요?</summary><p>사람인과 잡코리아는 상세요강까지 자동으로 받습니다. 원티드처럼 화면을 스크립트로 그리는 사이트, 그림 · PDF 공고, 회사 자체 채용 페이지 일부는 본문을 복사해 붙여 넣으면 됩니다. 사이트 이용약관을 확인하고 개인 용도로만 쓰세요.</p></details>
+    <details><summary>경험 카드를 꼭 직접 써야 하나요?</summary><p>아니요. 이력서 · 포트폴리오 · 프로젝트 문서 · 예전 자소서를 <code>sources/</code>에 넣으면 AI가 뽑아 줍니다. txt · md · csv · docx · hwpx · pptx · xlsx · html · PDF는 스크립트가 읽고, 그림 · 스캔 PDF는 AI가 원본을 봅니다(웹 채팅은 파일 첨부). <code>.hwp</code> 같은 옛 형식은 hwpx나 PDF로 저장해 넣으세요. AI가 자료에 없는 숫자를 facts에 넣으면 스크립트가 빼고, 카드는 모두 확인 전으로 붙습니다.</p></details>
     <details><summary>매칭 점수는 얼마나 믿을 만한가요?</summary><p>경험 카드 태그와 공고 낱말을 맞춘 참고치입니다. 태그를 공고에 나오는 표기(예: Spring Boot, PostgreSQL)로 적을수록 의미가 커집니다. 기술 낱말이 없는 항목("피드백을 받아들이는 태도")은 점수에서 빼고 몇 개인지만 알려 줍니다.</p></details>
     <details><summary>공고에 자소서 문항이 없으면요?</summary><p>지어내지 않습니다. 공고 분석 · 매칭 · 이력서 강조 포인트까지가 결과이고, 문항이 있으면 <code>jobs.xlsx</code> 문항 시트에 직접 입력하면 초안 단계로 이어집니다.</p></details>
     <details><summary>AI 사용량은 얼마나 드나요?</summary><p>공고 1건에 AI 왕복 2~3번입니다. 프롬프트는 공고 분석이 4천 자 안팎, 초안이 3천~8천 자입니다. 같은 공고 · 같은 경험 카드로 다시 돌리면 AI 단계를 건너뜁니다.</p></details>
@@ -533,7 +551,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
 
 <footer>
   <div class="wrap">
-    <span>jobfit v0.1.0 · MIT License</span>
+    <span>jobfit v0.2.0 · MIT License</span>
     <nav>
       <a href="https://github.com/donasman/jobfit">GitHub</a>
       <a href="https://github.com/donasman/jobfit#readme">README</a>

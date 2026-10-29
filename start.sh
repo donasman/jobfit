@@ -18,9 +18,12 @@ me_menu() {
  1. 문체 수치 계산 (me/samples 의 내 자소서)
  2. 문체 규칙 프롬프트 복사 (클립보드)
  3. 문체 규칙 답 붙여넣기 (클립보드)
- 4. 경험 카드 검사
- 5. 빈 경험 카드 추가
- 6. me 폴더 열기
+ 4. 경험 카드 만들기: 프롬프트 복사 (sources 폴더의 내 자료로)
+ 5. 경험 카드 만들기: AI 답 붙여넣기
+ 6. 경험 카드 검사
+ 7. 빈 경험 카드 추가
+ 8. me 폴더 열기
+ 9. sources 폴더 열기 (이력서·포트폴리오 넣는 곳)
  0. 돌아가기
 MENU
     read -r -p "번호: " m || exit 0  # 입력이 끊기면(파이프·자동 실행) 끝낸다
@@ -28,11 +31,14 @@ MENU
       1) uv run jobfit style stats ;;
       2) uv run jobfit prep style-rules --copy ;;
       3) uv run jobfit accept style-rules --paste ;;
-      4) uv run jobfit exp check ;;
-      5) uv run jobfit exp new ;;
-      6) open_dir me ;;
+      4) uv run jobfit exp extract --copy ;;
+      5) uv run jobfit accept exp-extract --paste ;;
+      6) uv run jobfit exp check ;;
+      7) uv run jobfit exp new ;;
+      8) open_dir me ;;
+      9) mkdir -p sources && open_dir sources ;;
       0) return ;;
-      *) echo "0~6 중에서 고르세요" ;;
+      *) echo "0~9 중에서 고르세요" ;;
     esac
   done
 }

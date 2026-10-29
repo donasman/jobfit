@@ -18,7 +18,7 @@ UNIMPLEMENTED: dict[str, str] = {}
 # 단계별 실행 명령이 먼저 끝나 있어야 하는 단계
 _PREREQ = {"clean": "fetch", "match": "analyze", "report": "match"}
 # AI 단계 이름 -> 아직이면 들어올 버전, 됐으면 None. revise 는 draft 의 수정 단계
-AI_STEPS = {"analyze": None, "draft": None, "revise": None, "style-rules": None, "exp-extract": "v2"}
+AI_STEPS = {"analyze": None, "draft": None, "revise": None, "style-rules": None, "exp-extract": None}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,7 +46,7 @@ def cmd_init(project: Project, args) -> int:
     else:
         create_jobs_workbook(project.jobs_xlsx)
         made.append(project.jobs_xlsx.name)
-    for d in (project.output_dir, project.state_dir):
+    for d in (project.output_dir, project.state_dir, project.sources_dir):
         if not d.exists():
             d.mkdir(parents=True)
             made.append(d.name + "/")
@@ -60,7 +60,8 @@ def cmd_init(project: Project, args) -> int:
     if not project.state_file.exists():
         State().save(project.state_file)
     print("만든 것: " + (", ".join(made) if made else "없음(모두 있었음)"))
-    print("다음: jobs.xlsx 공고 시트에 회사명·링크·마감일을 적고  jobfit run")
+    print("다음: 내 이력서·포트폴리오·프로젝트 문서를 sources/ 에 넣고  jobfit exp extract  (경험 카드 만들기)")
+    print("      공고는 jobs.xlsx 공고 시트에 적고  jobfit run")
     return 0
 
 
@@ -207,6 +208,8 @@ def cmd_exp(project: Project, args) -> int:
     if not project.me_dir.exists():
         print("me/ 폴더가 없습니다. 먼저  jobfit init")
         return 2
+    if args.exp_command == "extract":
+        return _prep_exp(project, args)
     path = project.experiences_file
     cards, problems = load_cards(path)
     if args.exp_command == "new":
@@ -301,6 +304,8 @@ def cmd_prep(project: Project, args) -> int:
         return 2
     if step == "style-rules":
         return _prep_style(project, args)
+    if step == "exp-extract" or (step is None and not args.job and _exp_pending(project)):
+        return _prep_exp(project, args)  # 경험 카드가 매칭에 쓰이므로 공고보다 먼저
     state = State.load(project.state_file)
     job = _pick_job(state, args.job) if args.job else _waiting_job(state)
     if job is None:
@@ -330,6 +335,7 @@ def cmd_prep(project: Project, args) -> int:
     job.status, job.next_hint = STATUS_AI, pipeline.AI_HINT
     state.save(project.state_file)
     print(f"{job.company}: 프롬프트 {project.rel(prepared.prompt_path)} ({prepared.chars}자 / 상한 {prepared.limit}자)")
+    _remember_prompt(project, prepared.prompt_path)
     if prepared.over_limit:
         print("  ! 상한을 넘었습니다. 무료 웹 채팅에서 잘릴 수 있습니다 — 그 공고의 posting.txt나 경험 카드 내용을 줄이세요")
     return _copy_prompt(prepared.prompt_path, args.copy, copy_to_clipboard)
@@ -346,6 +352,8 @@ def cmd_accept(project: Project, args) -> int:
         return 2
     if step == "style-rules":
         return _accept_style(project, args)
+    if step == "exp-extract" or (step is None and not args.job and _accept_goes_to_exp(project)):
+        return _accept_exp(project, args)
     state = State.load(project.state_file)
     job = _pick_job(state, args.job) if args.job else _waiting_job(state)
     if job is None:
@@ -433,6 +441,103 @@ def _print_lints(lints) -> None:
         print(f"  {ql.qid}: {ql.chars}{limit}자 · 오류 {len(ql.errors)} · 경고 {len(ql.warnings)} · 확인 필요 {ql.confirm_needed}")
         for issue in ql.errors:
             print(f"    ⛔ {issue.message}")
+
+
+def _exp_pending(project: Project) -> bool:
+    from jobfit.ai import exp_extract
+
+    return bool(exp_extract.pending_items(project))
+
+
+def _remember_prompt(project: Project, path: Path) -> None:
+    """마지막으로 보여 준 프롬프트. 답을 붙여넣을 때(accept --paste) 그 프롬프트의 단계로 보낸다."""
+    project.state_dir.mkdir(parents=True, exist_ok=True)
+    (project.state_dir / "last_prompt.txt").write_text(project.rel(path), encoding="utf-8")
+
+
+def _last_prompt(project: Project) -> str | None:
+    p = project.state_dir / "last_prompt.txt"
+    return p.read_text(encoding="utf-8").strip() if p.exists() else None
+
+
+def _accept_goes_to_exp(project: Project) -> bool:
+    """단계를 안 주면 경험 카드가 먼저. 단, 마지막으로 보여 준 프롬프트가 공고 것이고 그 공고가 답을 기다리면 공고로."""
+    if not _exp_pending(project):
+        return False
+    last = _last_prompt(project) or ""
+    if last.startswith(project.rel(project.exp_dir)):
+        return True
+    if "/_ai/" in last:
+        return _waiting_job(State.load(project.state_file)) is None
+    return True
+
+
+def _prep_exp(project: Project, args) -> int:
+    """sources/ 를 다시 훑고, 남은 첫 조각의 프롬프트를 보여 준다(--copy 면 클립보드)."""
+    from jobfit.ai import exp_extract
+    from jobfit.ai.promptfile import copy_to_clipboard
+
+    report = exp_extract.scan(project, force=getattr(args, "force", False))
+    _print_scan(project, report)
+    if not report.pending:
+        return 0 if (report.done or report.skipped) else 1
+    item = report.pending[0]
+    chars = len(item.prompt.read_text(encoding="utf-8"))
+    part = f" 조각 {item.part}/{item.parts}" if item.parts > 1 else ""
+    print(f"프롬프트: {project.rel(item.prompt)} ({item.source}{part} · {chars}자 / 상한 {exp_extract.limit()}자)")
+    _remember_prompt(project, item.prompt)
+    if chars > exp_extract.limit():
+        print("  ! 상한을 넘었습니다. 무료 웹 채팅에서 잘릴 수 있습니다 — me/experiences.yaml 카드가 많으면 생길 수 있어요")
+    if item.direct:
+        print("  ! 스크립트가 읽지 못한 파일입니다 — 에이전트는 원본을 직접 열고, 웹 채팅이라면 이 프롬프트와 함께 그 파일을 첨부하세요")
+    return _copy_prompt(item.prompt, args.copy, copy_to_clipboard)
+
+
+def _accept_exp(project: Project, args) -> int:
+    from jobfit.ai import exp_extract
+
+    raw_given = bool(args.paste or args.file)
+    prefer = _last_prompt(project)
+    item = exp_extract.pick(project, raw_given, prefer)
+    if item is None:
+        print("경험 카드 답을 기다리는 자료가 없습니다. 먼저  jobfit exp extract")
+        return 1
+    raw, rc = _read_answer(args, item.prompt)
+    if rc:
+        return rc
+    result = exp_extract.accept(project, raw, prefer=project.rel(item.prompt))
+    if not result.ok:
+        for e in result.errors:
+            print(f"  - {e}")
+        if result.item:
+            print(f"같은 프롬프트로 다시: {project.rel(result.item.prompt)}  (jobfit prep exp-extract --copy)")
+        return 1
+    src = result.item.source if result.item else ""
+    print(f"{src}: 경험 카드 {len(result.added)}개를 me/experiences.yaml 에 추가했습니다 (모두 verified: false)")
+    for card in result.added:
+        print(f"  + {card['id']}: {card['title']} · facts {len(card['facts'])}개")
+    for w in result.warnings:
+        print(f"  ! {w}")
+    if result.remaining:
+        print(f"남은 자료 조각 {result.remaining}개 — 다음: jobfit prep exp-extract --copy (메뉴 3)")
+    else:
+        print("자료를 모두 카드로 만들었습니다. 다음: jobfit exp check 로 확인하고, 사실이 맞으면 verified: true 로")
+    return 0
+
+
+def _print_scan(project: Project, report) -> None:
+    for rel in report.new:
+        print(f"  새 자료: {rel}")
+    for rel in report.changed:
+        print(f"  바뀐 자료: {rel}")
+    for rel, why in report.skipped:
+        print(f"  ! 건너뜀: {rel} — {why}")
+    if not (report.new or report.changed or report.pending or report.done or report.skipped):
+        print(f"{project.rel(project.sources_dir)}/ 에 자료가 없습니다. 이력서·포트폴리오·프로젝트 문서를 넣어 주세요(형식 무관)")
+    elif report.pending:
+        print(f"경험 카드 뽑기를 기다리는 조각 {len(report.pending)}개")
+    elif report.done:
+        print(f"모든 자료를 카드로 만들었습니다({len(report.done)}개). 다시 뽑으려면 --force")
 
 
 def _prep_style(project: Project, args) -> int:
@@ -708,6 +813,10 @@ def _build_parser() -> argparse.ArgumentParser:
     exp = sub.add_parser("exp", help="경험 카드 (me/experiences.yaml)")
     exp_sub = exp.add_subparsers(dest="exp_command", required=True)
     exp_sub.add_parser("check", help="카드 검사").set_defaults(func=cmd_exp)
+    exp_extract = exp_sub.add_parser("extract", help="sources/ 의 내 자료로 경험 카드 뽑기 프롬프트 만들기 (AI 단계)")
+    exp_extract.add_argument("--copy", action="store_true", help="첫 프롬프트를 클립보드에 복사")
+    exp_extract.add_argument("--force", action="store_true", help="이미 처리한 자료도 다시")
+    exp_extract.set_defaults(func=cmd_exp)
     exp_new = exp_sub.add_parser("new", help="빈 카드 하나 추가")
     exp_new.add_argument("--id", help="카드 id (기본 exp-<번호>)")
     exp_new.set_defaults(func=cmd_exp)

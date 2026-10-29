@@ -1,12 +1,13 @@
 # jobfit — 공고 기반 자소서 파이프라인
 
-**소개·사용법 페이지:** https://donasman.github.io/jobfit/ · **내려받기:** [v0.1.0](https://github.com/donasman/jobfit/releases/tag/v0.1.0)
+**소개·사용법 페이지:** https://donasman.github.io/jobfit/ · **내려받기:** [최신 버전](https://github.com/donasman/jobfit/releases/latest)
 
 채용공고 링크를 적어 두면 공고를 받아 정리하고, AI가 공고를 분석해 내 경험 카드와 맞춘 뒤 자기소개서 초안을 쓰고, 다시 스크립트가 **글자수·지어낸 숫자·연락처**를 검사해 한 장(`report.md`)으로 정리해 준다.
 
 **스크립트가 보장하고 AI는 판단만 한다.** AI는 스크립트가 만든 프롬프트 하나만 보고 답 하나만 낸다. 그 답이 형식을 어기거나 경험 카드에 없는 숫자를 쓰면 스크립트가 잡는다.
 
 ```
+내 자료(이력서·포트폴리오, 아무 형식) ─▶ 글자 꺼내기 ─▶ [AI] 경험 카드 뽑기 ─▶ 숫자 원문 대조 ─▶ me/experiences.yaml
 공고 링크 ─▶ 받기·정제 ─▶ [AI] 공고 분석 ─▶ 경험 카드 매칭 ─▶ report.md (매칭 점수 · 이력서 강조 포인트)
                                                    │
                                      문항이 있으면 ▼
@@ -34,7 +35,7 @@
 ## 설치
 
 1. [Releases](../../releases)에서 `jobfit-v<버전>.zip`을 받아 원하는 곳에 푼다.
-2. `start.bat`(macOS는 `./start.sh`)을 실행하고 **1. 처음 설정**. `jobs.xlsx`, `me/`, `output/`이 생긴다.
+2. `start.bat`(macOS는 `./start.sh`)을 실행하고 **1. 처음 설정**. `jobs.xlsx`, `me/`, `sources/`, `output/`이 생긴다.
 
 ## 처음 한 번: 내 정보 넣기 (`me/`)
 
@@ -42,11 +43,29 @@
 
 | 파일 | 내용 | 필수 |
 |---|---|---|
+| `sources/` | **내 자료** — 이력서·포트폴리오·프로젝트 문서·예전 자소서. 형식 무관 | 경험 카드를 AI로 만들 때 |
 | `me/experiences.yaml` | **경험 카드** — 경험 하나에 카드 하나. 태그, STAR(상황·과제·행동·결과), **facts(확정한 수치·사실만)**, 쓸 문항 유형, `verified` | 매칭·초안에 필요 |
 | `me/resume.yaml` | 이력서 항목 — report의 "위로 올릴 항목·공고 표기로 맞출 것"에 쓰인다 | 선택 |
 | `me/samples/` | 내가 쓴 자소서(.txt · .md · .docx · .hwpx) — 문체 맞추기용 | 선택 |
 
-처음에는 예시(`me.example/`의 내용)가 복사돼 있다. 내 경험으로 바꾸고 메뉴 **7 → 4**(경험 카드 검사)로 확인한다. 빈 카드는 **7 → 5**.
+처음에는 예시(`me.example/`의 내용)가 복사돼 있다. 예시 카드 두 개는 지우고 내 카드로 채운다.
+
+### 경험 카드를 AI로 만들기
+
+1. 이력서·포트폴리오·프로젝트 문서를 `sources/`에 넣는다(메뉴 **7 → 9**로 폴더 열기).
+2. 메뉴 **7 → 4** — 자료마다 프롬프트가 만들어지고 첫 프롬프트가 클립보드에 복사된다. 웹 채팅에 붙여 넣는다.
+3. 답 전체를 복사하고 메뉴 **7 → 5**(또는 메뉴 **4**). 자료가 길면 조각으로 나뉘니 남은 조각이 없을 때까지 반복한다.
+4. 메뉴 **7 → 6**(경험 카드 검사)으로 보고, `me/experiences.yaml`에서 사실이 맞는 카드를 `verified: true`로 바꾼다.
+
+| 자료 형식 | 누가 읽나 |
+|---|---|
+| txt · md · csv · docx · hwpx · pptx · xlsx · html · 글자가 있는 PDF | 스크립트가 글자를 꺼내 프롬프트에 넣는다 |
+| 그림(png·jpg 등) · 스캔한 PDF | AI가 원본을 직접 읽는다 — 에이전트는 파일을 열고, 웹 채팅은 그 파일을 첨부한다 |
+| hwp · doc · ppt · xls(옛 형식) · 암호 걸린 파일 | 건너뛴다 — hwpx·docx·PDF로 저장해 다시 넣는다 |
+
+AI가 뽑은 카드는 받기 전에 스크립트가 검사한다. **facts의 숫자가 자료 원문에 없으면 그 fact를 빼고 알려 준다.** 이미 있는 카드와 같은 경험은 건너뛰고, 새 카드는 모두 `verified: false`로 `me/experiences.yaml` 맨 아래에 붙는다(붙이기 전 `.jobfit/backups/`에 백업). 한 번 처리한 자료는 바뀌지 않는 한 다시 하지 않는다.
+
+직접 쓰려면 빈 카드는 **7 → 7**, 검사는 **7 → 6**.
 
 > **facts가 핵심이다.** 초안에 나오는 숫자는 전부 그 문항에 배정된 카드의 facts에 있어야 한다. 없는 숫자(예: 계산해서 만든 "78% 개선")는 검사에서 오류가 되고, AI에게 다시 고치게 한다. 확인 안 된 카드(`verified: false`)의 숫자는 경고로 표시된다.
 
@@ -67,14 +86,14 @@
 
 **Claude Code** (CLI · 데스크톱 앱 · VS Code)
 1. 이 폴더를 연다. **처음 열 때 나오는 폴더 신뢰 창에서 신뢰를 고른다** — 그래야 `.claude/settings.json`의 허용 규칙(`uv run jobfit …` 실행, AI 답 파일 쓰기)이 적용된다. 읽기 차단(`me/`·공고 원문)은 신뢰 전에도 적용된다.
-2. "이 링크 공고 처리해줘: https://…" 또는 "새 공고 처리해줘".
+2. "sources에 넣은 내 자료로 경험 카드 만들어줘", "이 링크 공고 처리해줘: https://…", "새 공고 처리해줘".
 
 **Codex** (CLI · 앱)
 1. 이 폴더에서 연다. Codex는 `AGENTS.md`를 바로 읽는다.
 2. 같은 말로 요청한다.
 3. 샌드박스에서 `uv`가 캐시 폴더 오류를 내면 에이전트가 `UV_CACHE_DIR=.uv-cache`로 돌려 실행하도록 지침에 적혀 있다.
 
-에이전트는 `AGENTS.md`대로 `uv run jobfit` 명령만 쓰고, 프롬프트 파일만 읽고, 답 파일만 쓴다. `me/`·`jobs.xlsx`·공고 원문은 읽지 않는다. Notion에는 요청할 때만 올린다.
+에이전트는 `AGENTS.md`대로 `uv run jobfit` 명령만 쓰고, 프롬프트 파일만 읽고, 답 파일만 쓴다. `me/`·`jobs.xlsx`·공고 원문은 읽지 않는다. `sources/`는 스크립트가 못 읽은 그림·스캔 PDF를 프롬프트가 지정할 때만 그 파일 하나를 연다. Notion에는 요청할 때만 올린다.
 
 > 2026-10-29 Claude Code 2.1.312와 Codex CLI 0.146.1로, "새 공고 처리해줘" 한 마디에 실제 공고 1건(문항 3개)이 분석 → 매칭 → 초안 → report.md까지 가고 금지 파일을 읽지 않는 것을 실행 로그로 확인했다([docs/SPEC.md §13](docs/SPEC.md)).
 
@@ -93,14 +112,15 @@
 - **초안은 그대로 내지 말고 내 말투로 다시 다듬는다.** `[확인 필요: …]` 자리는 사실을 채우거나 문장을 뺀다.
 - 매칭 점수는 경험 카드 태그와 공고 낱말을 맞춘 참고치다. 태그를 공고에 나오는 표기로 적을수록 의미가 있다.
 - 공고는 **사용자가 적은 링크 한 건씩만** 받는다. 사이트를 돌며 긁어 오는 크롤러는 없다. robots.txt를 따르고, 사이트 이용약관을 확인해 개인 용도로만 쓴다.
-- AI에게 넘어가는 것: 공고 본문(담당자 연락처는 가림), 경험 카드 태그, 문항마다 배정된 카드의 STAR·facts, 문체 규칙. 경험 카드 전체나 연락처는 넘어가지 않는다.
+- AI에게 넘어가는 것: 공고 본문(담당자 연락처는 가림), 경험 카드 태그, 문항마다 배정된 카드의 STAR·facts, 문체 규칙. 경험 카드를 뽑을 때는 `sources/` 자료의 글자(또는 그 파일)와 이미 있는 카드의 id·제목. 자료의 전화번호·이메일은 스크립트가 가리지만 **주소·주민번호 같은 다른 개인정보와 그림·스캔 PDF 원본은 그대로 넘어가니**, 그런 내용은 지운 사본을 넣는다.
 - `jobs.xlsx`에는 `jobfit add`를 부를 때만 스크립트가 한 줄 추가한다(엑셀이 열려 있으면 안 쓰고, 쓰기 전에 `.jobfit/backups/`에 백업). 이때 파일을 다시 저장하므로 직접 넣은 그림·차트는 빠질 수 있다.
 
 ## 알려진 한계
 
 - 원티드처럼 화면을 스크립트로 그리는 사이트, 그림·PDF 공고, `.hwp` 파일은 직접 붙여 넣어야 한다.
 - 잡코리아 요약 칸(경력·학력)은 아직 읽지 않는다(본문에는 들어 있다).
-- 공고 자동 수집(알림 메일·API), Notion API 직접 쓰기, 기존 자소서에서 경험 카드 뽑기는 다음 버전.
+- 공고 자동 수집(알림 메일·API), Notion API 직접 쓰기는 다음 버전.
+- 경험 카드 뽑기의 숫자 대조는 값만 본다. 숫자가 자료에 있어도 다른 맥락에서 가져왔을 수 있으니 `verified`는 직접 확인하고 바꾼다.
 
 ## 폴더
 
@@ -108,7 +128,9 @@
 jobs.xlsx        사용자 입력 — 공고 · 문항 · 안내 시트
 dashboard.xlsx   스크립트 출력 (매번 다시 만듦)
 me/              내 정보 — 경험 카드 · 이력서 항목 · 자소서 샘플 · 문체 규칙 (내 컴퓨터에만)
+sources/         경험 카드를 뽑을 내 자료 — 이력서 · 포트폴리오 · 프로젝트 문서 (내 컴퓨터에만)
 output/<공고>/   공고별 결과 — 받은 원문, posting.txt, analysis.json, match.json, drafts/, lint.json, report.md, _ai/(프롬프트·답)
+output/_exp/_ai/ 경험 카드 뽑기 프롬프트·답
 .jobfit/         스크립트 내부 상태 · 캐시 · 백업
 AGENTS.md        에이전트 작업 지침 (CLAUDE.md 는 이 파일을 가져오기만 한다)
 docs/SPEC.md     설계 전체
@@ -116,7 +138,7 @@ docs/SPEC.md     설계 전체
 
 ## 명령 모음
 
-`uv run jobfit <명령>` — `init` · `add` · `run` · `next` · `check` · `sync-in` · `fetch` · `clean` · `posting` · `prep` · `accept` · `match` · `report` · `dashboard` · `exp check` · `exp new` · `style stats` · `export notion` · `usage`. 자세한 건 `uv run jobfit --help`와 [docs/SPEC.md §10](docs/SPEC.md).
+`uv run jobfit <명령>` — `init` · `add` · `run` · `next` · `check` · `sync-in` · `fetch` · `clean` · `posting` · `prep` · `accept` · `match` · `report` · `dashboard` · `exp extract` · `exp check` · `exp new` · `style stats` · `export notion` · `usage`. 자세한 건 `uv run jobfit --help`와 [docs/SPEC.md §10](docs/SPEC.md).
 
 ## 개발
 

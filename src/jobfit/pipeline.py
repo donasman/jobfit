@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from jobfit import jobkey
-from jobfit.ai import analyze, draft
+from jobfit.ai import analyze, draft, exp_extract
 from jobfit.clean.posting import FILE_POSTING, clean_job
 from jobfit.dashboard import DashboardBusy, build_dashboard
 from jobfit.excel.reader import JobRow, QuestionRow, ReadResult, read_jobs_workbook
@@ -165,6 +165,13 @@ def run(project: Project, state: State, only: Job | None = None) -> list[str]:
     """AI 단계 직전까지 실행하고 대시보드를 다시 만든다. 공고별 결과 한 줄씩 돌려준다."""
     lines: list[str] = []
     targets = [only] if only else sorted(state.active_jobs(), key=lambda j: j.row)
+    if not only and exp_extract.list_sources(project):
+        # 경험 카드 자료도 AI 단계 직전까지 — 바뀐 자료의 프롬프트를 만들어 둔다
+        report = exp_extract.scan(project)
+        if report.pending:
+            lines.append(f"경험 카드: sources/ 자료 조각 {len(report.pending)}개가 AI 단계를 기다립니다")
+        for rel, why in report.skipped:
+            lines.append(f"경험 카드: {rel} 건너뜀 — {why}")
     for job in targets:
         if not job.is_active:
             lines.append(f"{job.company}: 결정이 '{job.decision}'이라 건너뜀")
@@ -311,12 +318,33 @@ def _load_json(path: Path) -> dict:
 def next_action(project: Project, state: State) -> Action:
     if not project.is_initialized():
         return Action(kind="run", message="처음 설정이 필요합니다", command="jobfit init")
+    # 경험 카드가 매칭에 쓰이므로, 같은 급이면 자료 → 공고 순서로 안내한다
+    exp = _exp_action(project)
     if not state.jobs:
-        return Action(kind="edit", message='jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>" 로 추가한 뒤 jobfit run (메뉴 2)', command="jobfit run")
-    actions = [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
+        return exp or Action(kind="edit", message='jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>" 로 추가한 뒤 jobfit run (메뉴 2)', command="jobfit run")
+    actions = ([exp] if exp else []) + [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
     if actions:
-        return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 jobs.xlsx 위쪽 공고부터
+        return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 앞의 것(자료, 그다음 jobs.xlsx 위쪽 공고)
     return Action(kind="done", message="처리할 공고가 없습니다. 새 공고를 jobs.xlsx에 적거나 결정을 미정으로 돌리세요", command="jobfit sync-in")
+
+
+def _exp_action(project: Project) -> Action | None:
+    items = exp_extract.pending_items(project)
+    if items:
+        item = items[0]
+        part = f" 조각 {item.part}/{item.parts}" if item.parts > 1 else ""
+        direct = "\n  (스크립트가 못 읽은 파일 — 에이전트는 원본을 직접 열고, 웹 채팅은 파일을 첨부)" if item.direct else ""
+        message = (
+            f"경험 카드 뽑기: {item.source}{part} — AI 단계입니다.\n"
+            f"  붙여넣기 모드: jobfit prep --copy → 웹 채팅에 붙여넣기 → 답 전체 복사 → jobfit accept --paste\n"
+            f"  에이전트 모드: {project.rel(item.prompt)} 를 읽고 답을 {project.rel(item.response)} 에 쓴 뒤 jobfit accept exp-extract"
+            f"{direct}"
+        )
+        return Action(kind="ai", message=message, command="jobfit prep exp-extract --copy")
+    new = exp_extract.new_sources(project)
+    if new:
+        return Action(kind="run", message=f"sources/ 에 새 자료 {len(new)}개 — 경험 카드로 만들려면", command="jobfit exp extract")
+    return None
 
 
 # 사용자가 손을 써야 하는 것 → AI 단계 → 스크립트로 진행 → 다음 버전 → 문항 입력 대기

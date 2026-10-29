@@ -39,10 +39,11 @@ jobfit/
 ├── README.md
 ├── jobs.xlsx                 # 사용자 전용 입력. 스크립트는 읽기만 (§3.1)
 ├── dashboard.xlsx            # 스크립트 전용 출력. 매 실행 재생성 (§3.2)
+├── sources/                  # 경험 카드를 뽑을 내 자료 (이력서·포트폴리오·프로젝트 문서, 형식 무관, 배포 제외) (§3.4.2)
 ├── me/                       # 내 정보 (개인정보, 배포 제외)
 │   ├── experiences.yaml      # 경험 은행 (§3.4)
 │   ├── resume.yaml           # 이력서 항목 (선택)
-│   ├── samples/              # 내가 쓴 자소서 원문 (.txt, .md, .docx, .hwpx)
+│   ├── samples/              # 내가 쓴 자소서 원문 (.txt, .md, .docx, .hwpx, .pdf)
 │   └── style/
 │       ├── style_stats.json  # 스크립트가 계산한 문체 수치
 │       └── style_rules.md    # AI가 1회 작성, 사람이 확정한 문체 규칙
@@ -60,8 +61,11 @@ jobfit/
 │   ├── lint.json             # 검사 결과
 │   ├── report.md             # 최종 정리 (Notion 가져오기용)
 │   └── _ai/                  # analyze·draft·revise 의 *.prompt.md / *.response.*
+├── output/_exp/_ai/          # 경험 카드 뽑기 extract-<자료>-<n>.prompt.md / .response.md
 ├── .jobfit/                  # 스크립트 내부 상태 (사용자가 건드리지 않음)
 │   ├── state.json            # 처리 상태 원장 (§3.3)
+│   ├── sources.json          # 자료별 해시·조각·처리 상태, sources/<자료>.txt 꺼낸 글자(연락처 가림)
+│   ├── last_prompt.txt       # 마지막으로 보여 준 프롬프트 (accept --paste 가 어느 단계로 보낼지)
 │   ├── cache/                # 입력 해시별 AI 응답 캐시
 │   ├── backups/              # `jobfit add`가 jobs.xlsx에 쓰기 직전 백업 (최근 10개)
 │   └── usage.jsonl           # 프롬프트·응답 길이 기록
@@ -72,7 +76,7 @@ jobfit/
 └── pyproject.toml
 ```
 
-`me/`, `output/`, `.jobfit/`, `jobs.xlsx`, `dashboard.xlsx`, `.env`는 `.gitignore` 대상이다. 배포본에는 `me.example/`과 `jobs.xlsx`를 만드는 `init`만 둔다.
+`me/`, `sources/`, `output/`, `.jobfit/`, `jobs.xlsx`, `dashboard.xlsx`, `.env`는 `.gitignore` 대상이다. 배포본에는 `me.example/`과 `jobs.xlsx`를 만드는 `init`만 둔다.
 
 ### 2.1 설치 허들 낮추기
 
@@ -198,6 +202,20 @@ jobfit/
   - **오류** — id·title·tags·summary·usable_for 비어 있음, id 중복, usable_for가 유형 목록 밖, facts가 문장 목록이 아님
   - **경고** — summary 60자 초과, 태그가 대표 표기가 아님(`스프링부트`→`Spring Boot`), facts 없음(그 카드로 쓴 초안에는 수치를 못 씀), star 비어 있음, verified 없음, period 형식(`2025-03 ~ 2025-06`)
 - `jobfit exp new [--id ID]`는 빈 카드 틀을 파일 맨 아래에 덧붙인다(사용자가 부를 때만 me/에 쓴다. 기존 내용·주석은 그대로).
+
+### 3.4.2 경험 카드 뽑기 (exp-extract, AI)
+
+사용자가 `sources/`에 넣은 자료(형식 무관)에서 AI가 카드를 뽑고, 스크립트가 검사해 `experiences.yaml`에 덧붙인다.
+
+1. **글자 꺼내기(스크립트, `textio`)** — txt·md·csv·docx·hwpx·pptx·xlsx·html·PDF(글자 층 있음). 그림·스캔 PDF(쪽당 40자 미만)는 "AI가 원본을 직접 읽을 것"으로 둔다. hwp·doc·ppt·xls·암호 파일·30MB 넘는 파일은 건너뛰고 이유를 알린다. 꺼낸 글자는 전화·이메일을 가려 `.jobfit/sources/`에 둔다.
+2. **프롬프트(`jobfit exp extract`, `run`도 만들어 둠)** — 자료 하나를 5,000자 조각으로 나눠 조각마다 `output/_exp/_ai/extract-<자료>-<n>.prompt.md`. 카드 형식·규칙, 이미 있는 카드 id·title, 태그 표기(자료에 나온 사전 낱말 + 기존 카드 태그), 자료 글자. 직접 읽을 파일이면 글자 대신 "에이전트는 그 파일 하나를 열고, 웹 채팅은 첨부" 안내.
+3. **받기(`jobfit accept exp-extract`)** — 답의 YAML 목록을 읽고(앞뒤 설명·코드블록 무시) 정리한다.
+   - 제목이 기존 카드와 같으면(공백·기호 무시) 건너뜀, id가 겹치면 `-2`를 붙임
+   - 태그는 대표 표기로, usable_for는 유형 목록 밖이면 뺌
+   - **facts의 숫자가 자료 원문에 없으면 그 fact를 뺌**(숫자 정규화 §4.6), star에 원문에 없는 숫자가 있으면 경고. 직접 읽은 파일은 대조할 원문이 없어 경고만
+   - 모두 `verified: false`, `source: sources/<자료>`. 파일 맨 아래에 me.example과 같은 꼴로 덧붙인다(쓰기 전 `.jobfit/backups/`에 백업, 덧붙인 결과가 yaml로 읽히는지 확인)
+4. 자료 해시가 같으면 다시 하지 않는다(`--force`로 다시). 자료가 바뀌면 그 자료의 옛 프롬프트·답 파일을 지운다 — 남아 있으면 에이전트 모드에서 옛 답을 새 자료에 받아들이게 된다.
+5. 단계를 안 주면 `next`·`prep`·`accept`는 경험 카드를 공고보다 먼저 가리킨다(카드가 매칭에 쓰이므로). 단 `accept`는 마지막으로 보여 준 프롬프트가 공고 것이고 그 공고가 답을 기다리면 공고로 보낸다. 답 파일로 받을 때(에이전트)는 답 파일이 있는 첫 조각을 받는다.
 
 ### 3.4.1 resume.yaml (선택)
 
@@ -388,7 +406,7 @@ AI가 하는 일은 이것뿐이다. 나머지는 전부 스크립트.
 | 단계 | 빈도 | 입력 | 출력 | 프롬프트 상한 |
 |---|---|---|---|---|
 | style-rules | 최초 1회, 샘플 변경 시 | 샘플 발췌 + style_stats | style_rules.md 초안 | 6,000자 |
-| exp-extract | 기존 자소서 파일당 1회 | 자소서 1개 + 카드 스키마 + 기존 카드 id·title 목록 | 경험 카드 초안 (yaml) | 8,000자 |
+| exp-extract | `sources/` 자료 조각당 1회 (5,000자 단위) | 자료 글자(연락처 가림) 또는 원본 직접 읽기 안내 + 카드 형식 + 기존 카드 id·title + 태그 표기 | 경험 카드 목록 (yaml) — §3.4.2 | 8,000자 |
 | analyze | 공고당 1회 | §4.3 | analysis.json | 6,000자 |
 | draft | 공고당 1회 | §4.5 | 문항별 초안 | 8,000자 |
 | revise | 공고당 0~1회 | 실패 문항 + 실패 항목만 | 수정본 | 6,000자 |
@@ -449,13 +467,14 @@ Notion에서 사람이 고친 내용은 로컬로 가져오지 않는다.
 - 진행: 시작은 `jobfit next`, 링크를 받으면 `add` → `run`. 스크립트 결과 파일을 손으로 만들지 않는다. 명령은 `uv run jobfit …`만 — 글자수·숫자 검사는 `accept`가 한다.
 - AI 단계: `next`가 알려 준 프롬프트 하나만 읽고, 첫 줄이 지정한 답 파일 하나만 쓰고, 바로 `accept`. 재요청은 1회, 수정 단계(revise)도 1회.
 - 읽지 않는 것: `me/`, `jobs.xlsx`, `.jobfit/`, 공고 원문(`posting*.txt`·`source*.html`). Claude Code는 `.claude/settings.json` deny로 강제, Codex는 지시만.
+- 경험 카드: 요청받거나 `sources/`에 자료가 들어오면 `exp extract` → 조각마다 프롬프트 읽고 답 쓰고 `accept exp-extract`. `sources/` 원본은 프롬프트가 지정한 그림·스캔 PDF 하나만 연다(deny로 막지 않는 이유). verified는 사람만 바꾼다.
 - Notion은 **사용자가 요청할 때만**(외부 서비스에 쓰는 일이라). 
 - 환경 문제: uv 캐시 오류(샌드박스) → `UV_CACHE_DIR=.uv-cache`. 승인 대기로 막히면 우회하지 말고 멈춘다.
 
 `CLAUDE.md`는 `@AGENTS.md` 한 줄만 둬서 지침 원본을 하나로 유지한다.
 
 `.claude/settings.json`(Claude Code 전용):
-- allow: `Bash(uv run jobfit:*)`, `PowerShell(uv run jobfit:*)`(Windows에서 Claude Code는 PowerShell로 먼저 실행한다), `Edit(./output/**/_ai/*.response.*)`, `Edit(./output/_style/style-rules.response.md)`
+- allow: `Bash(uv run jobfit:*)`, `PowerShell(uv run jobfit:*)`(Windows에서 Claude Code는 PowerShell로 먼저 실행한다), `Edit(./output/**/_ai/*.response.*)`(경험 카드 답 `output/_exp/_ai/`도 여기에 맞춘 자리), `Edit(./output/_style/style-rules.response.md)`
 - deny: `Read(./me/**)` `Read(./.jobfit/**)` `Read(./jobs.xlsx)` `Read(./output/**/posting.txt)` `Read(./output/**/posting.full.txt)` `Read(./output/**/source*.html)` `Read(./output/**/source.pdf)`
 - **allow는 폴더를 처음 열 때 신뢰 창을 승인해야 적용된다**(신뢰 전에는 무시된다는 경고가 뜬다). deny는 신뢰 전에도 적용된다.
 
@@ -469,20 +488,20 @@ Notion에서 사람이 고친 내용은 로컬로 가져오지 않는다.
 4. AI 응답 붙여넣기 (클립보드에서 읽어 저장 후 검증)
 5. 공고 본문 붙여넣기 (수집 실패한 공고용)
 6. 결과 폴더 열기
-7. 문체·경험 카드 (하위 메뉴: 문체 수치 계산 · 문체 규칙 프롬프트 복사 · 답 붙여넣기 · 경험 카드 검사 · 빈 카드 추가 · me 폴더 열기)
+7. 문체·경험 카드 (하위 메뉴: 문체 수치 계산 · 문체 규칙 프롬프트 복사 · 답 붙여넣기 · 경험 카드 만들기 프롬프트 복사 · 답 붙여넣기 · 경험 카드 검사 · 빈 카드 추가 · me 폴더 열기 · sources 폴더 열기)
 8. 다음 할 일 보기
 9. jobs.xlsx 검사
 0. 종료
 ```
 
-- 3번은 현재 대기 중인 AI 단계의 프롬프트를 클립보드에 복사하고 "웹 채팅에 붙여넣고, 답을 전체 복사한 뒤 4번을 누르세요"를 출력한다.
+- 3번은 현재 대기 중인 AI 단계(경험 카드 뽑기가 남아 있으면 그것부터)의 프롬프트를 클립보드에 복사하고 "웹 채팅에 붙여넣고, 답을 전체 복사한 뒤 4번을 누르세요"를 출력한다.
 - 4번은 클립보드를 읽어 응답 파일로 저장하고 바로 `accept`를 실행한 뒤, 성공하면 2번을 자동으로 이어서 실행한다.
 - 클립보드는 `pyperclip`. 실패 환경에서는 `--file`로 텍스트 파일 경로를 받는다.
 
 ## 10. CLI 명령 전체
 
 ```
-jobfit init                    # jobs.xlsx, me/(me.example 복사), output/, .jobfit/           MVP-1 ✓
+jobfit init                    # jobs.xlsx, me/(me.example 복사), sources/, output/, .jobfit/  MVP-1 ✓
 jobfit add [링크] [--company C] [--title T] [--deadline D] [--memo M]  # 공고 한 줄 추가(§7)   MVP-1 ✓
 jobfit check                   # jobs.xlsx 검사만                                             MVP-1 ✓
 jobfit sync-in                 # jobs.xlsx 읽어 state 반영                                    MVP-1 ✓
@@ -495,7 +514,8 @@ jobfit accept [analyze] [--job ID] [--paste | --file F]      # 답 검사·반�
 jobfit prep/accept draft [--job ID]          # 초안 (수정 단계도 같은 명령, revise 는 별칭)   MVP-4 ✓
 jobfit prep/accept style-rules               # 문체 규칙 초안 → me/style/style_rules.md        MVP-4 ✓
 jobfit style stats                           # 문체 수치 → me/style/style_stats.json            MVP-4 ✓
-jobfit prep/accept exp-extract                                                                v2
+jobfit exp extract [--copy] [--force]        # sources/ 훑고 경험 카드 프롬프트 (§3.4.2)       v0.2 ✓
+jobfit prep/accept exp-extract [--paste | --file F]   # 남은 조각 프롬프트 / 답 검사·덧붙이기  v0.2 ✓
 jobfit usage                   # 공고별 프롬프트·응답 길이 집계                                MVP-2 ✓
 jobfit exp check / exp new [--id ID]   # 경험 카드 검사 / 빈 카드 틀 덧붙이기                 MVP-3 ✓
 jobfit match / report [--job ID]       # 한 단계만 다시 (대시보드도 갱신)                      MVP-3 ✓
@@ -515,7 +535,8 @@ jobfit discover [--plan] / discover parse                                       
 | **MVP-3 ✓** | 경험 카드 `exp check`·`exp new`, `match`, **`report`(강조 포인트 포함) + `dashboard`** | 문항 없는 공고도 여기서 완결 (실제 공고 2건으로 확인) |
 | **MVP-4 ✓** | `style stats`, style-rules, `prep`/`accept draft`, lint(숫자 정규화), revise | 문항 있는 공고 초안 (실제 공고 1건·문항 3개로 확인) |
 | **MVP-5 ✓** | AGENTS.md 에이전트 모드 검증(Claude Code · Codex), `export notion --csv` | §12 완료 기준 (사람이 직접 해야 하는 붙여넣기 모드 확인은 남음) |
-| v2 | discover(메일 → API → 브라우저), Notion API, exp-extract, 사이트별 fetcher 추가, exe, OCR | |
+| **v0.2 ✓** | exp-extract(§3.4.2) — `sources/` 아무 형식 자료 → AI 경험 카드, 숫자 원문 대조, `experiences.yaml`에 덧붙이기 | 이력서·포트폴리오만 넣고 카드까지 |
+| v2 | discover(메일 → API → 브라우저), Notion API, 사이트별 fetcher 추가, exe, OCR | |
 
 각 단계는 이전 단계 산출물 파일만 보고 독립 실행 가능해야 한다.
 
@@ -602,3 +623,7 @@ jobfit discover [--plan] / discover parse                                       
 | 29 | allow: `Bash(uv run jobfit:*)` | + `PowerShell(uv run jobfit:*)`, 답 파일 `Edit(...)` | Windows의 Claude Code는 PowerShell 도구로 먼저 실행한다 |
 | 30 | 테스트 픽스처 = 실제 사이트 HTML | 공개 테스트는 합성 픽스처(가상 회사), 실제 페이지는 `tests/fixtures_live/`(gitignore, 있으면 도는 회귀 테스트) | 사이트 저작물·담당자 정보를 배포하지 않기 위해. 합성 픽스처가 헤더 판정의 회사명 길이 버그를 찾았다 |
 | 31 | `exp check`: verified 없을 때만 경고 | `verified: false`도 경고 | 에이전트가 "검사는 문제없음, report는 확인 필요"를 모순으로 읽었다 |
+| 32 | exp-extract v2, 입력은 기존 자소서 1개 | **v0.2로 당김.** 입력은 `sources/`의 아무 형식 자료(이력서·포트폴리오·프로젝트 문서), 스크립트가 글자를 먼저 꺼내고 못 읽는 그림·스캔 PDF만 AI가 원본을 직접 읽음 | 사용자 요청: 카드를 손으로 쓰는 것이 가장 큰 진입 장벽. 글자를 스크립트가 꺼내야 붙여넣기 모드도 되고 숫자를 원문과 대조할 수 있다 |
+| 33 | — | 뽑은 카드는 `experiences.yaml`에 바로 덧붙임(백업 후), 모두 `verified: false` | 사용자 선택. 확인 전 카드의 숫자는 초안에서 이미 경고로 표시되므로 별도 검토 파일 없이도 안전 |
+| 34 | — | facts의 숫자가 자료 원문에 없으면 그 fact를 뺌 | AI가 계산해서 만든 숫자("70% 단축")가 facts에 들어가면 이후 초안 검사가 그 숫자를 사실로 믿게 된다 |
+| 35 | — | 에이전트 답 파일 자리는 `output/_exp/_ai/`, 자료가 바뀌면 옛 프롬프트·답 삭제, `accept --paste`는 마지막으로 보여 준 프롬프트의 단계로 | 기존 allow 규칙을 바꾸지 않으려고. 옛 답이 남으면 에이전트가 새 자료에 옛 답을 받아들였다(테스트로 확인). 공고와 카드가 동시에 기다릴 때 붙여넣은 답이 엉뚱한 단계로 가지 않게 |

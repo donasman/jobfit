@@ -1,20 +1,20 @@
 """문체 — 자소서 샘플 읽기, 문체 통계(스크립트), 문체 규칙 파일에서 금지 표현 읽기.
 
-샘플: me/samples/ 의 .txt · .md · .docx · .hwpx (내가 쓴 자소서 원문).
+샘플: me/samples/ 의 .txt · .md · .docx · .hwpx · .pdf (내가 쓴 자소서 원문). 글자 꺼내기는 textio.
 통계: me/style/style_stats.json — `jobfit style stats`가 계산한다. AI 없음.
 규칙: me/style/style_rules.md — AI가 한 번 쓰고 사람이 확정한다(`prep style-rules`).
 """
 
 from __future__ import annotations
 
-import html
 import json
 import re
-import zipfile
 from collections import Counter
 from pathlib import Path
 
-SAMPLE_EXTS = (".txt", ".md", ".docx", ".hwpx")
+from jobfit.textio import read_any
+
+SAMPLE_EXTS = (".txt", ".md", ".docx", ".hwpx", ".pdf")
 MIN_SAMPLES_FOR_LINT = 5
 SPECIAL_CHARS = ("·", "…", '"', "'", "(", "~", "!", "—")
 CONNECTIVES = ("그래서", "하지만", "그러나", "또한", "따라서", "이를 통해", "그 결과", "특히", "먼저", "이후", "그리고", "결국", "덕분에", "반면", "이처럼", "즉")
@@ -38,14 +38,7 @@ def list_samples(me_dir: Path) -> list[Path]:
 
 
 def read_sample(path: Path) -> str:
-    ext = path.suffix.lower()
-    if ext in (".txt", ".md"):
-        return path.read_text(encoding="utf-8", errors="replace")
-    if ext == ".docx":
-        return _zip_text(path, ("word/document.xml",), para_tag="p", text_tag="t")
-    if ext == ".hwpx":
-        return _zip_text(path, tuple(), para_tag="p", text_tag="t", prefix="Contents/section")
-    return ""
+    return read_any(path).text or ""
 
 
 def split_sentences(text: str) -> list[str]:
@@ -134,27 +127,3 @@ def forbidden_expressions(rules: str) -> list[str]:
             if 0 < len(head) <= 30:
                 out.append(head)
     return list(dict.fromkeys(out))
-
-
-_MAX_XML_BYTES = 20_000_000  # 압축 폭탄 방지 — 자소서 한 편의 XML은 이보다 훨씬 작다
-
-
-def _zip_text(path: Path, names: tuple[str, ...], para_tag: str, text_tag: str, prefix: str = "") -> str:
-    """docx·hwpx 본문 글자. XML 파서를 쓰지 않고 문단·글자 태그만 정규식으로 꺼낸다(엔티티를 풀지 않는다)."""
-    para_end = re.compile(rf"</(?:\w+:)?{para_tag}>")
-    text_re = re.compile(rf"<(?:\w+:)?{text_tag}(?:\s[^>]*)?>(.*?)</(?:\w+:)?{text_tag}>", re.S)
-    try:
-        with zipfile.ZipFile(path) as z:
-            members = list(names) or sorted(n for n in z.namelist() if n.startswith(prefix) and n.endswith(".xml"))
-            paras: list[str] = []
-            for name in members:
-                if name not in z.namelist() or z.getinfo(name).file_size > _MAX_XML_BYTES:
-                    continue
-                xml = z.read(name).decode("utf-8", errors="replace")
-                for chunk in para_end.split(xml):
-                    text = "".join(text_re.findall(chunk))
-                    if text or paras:
-                        paras.append(html.unescape(re.sub(r"<[^>]+>", "", text)))
-            return "\n".join(paras).strip()
-    except (zipfile.BadZipFile, KeyError, OSError):
-        return ""
