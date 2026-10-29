@@ -342,6 +342,17 @@ def normalize_cards(data: list, existing: list[dict], kd: KeywordDict, source_te
                 warnings.append(f"{cid}: 자료 원문에 없는 숫자가 있어 이 fact를 뺐습니다 — \"{fact}\"")
                 continue
             facts.append(fact)
+        # star 에만 있고 facts 에 없는 숫자(원문에는 있는 것) — 초안에 쓰면 검사에 걸리니 바로 알린다
+        fact_nums = [n for f in facts for n in extract(f).numbers]
+        loose = [
+            n.raw for n in star_nums
+            if not same_value(n, fact_nums) and (src_numbers is None or same_value(n, src_numbers))
+        ]
+        if loose:
+            warnings.append(
+                f"{cid}: star에 facts에 없는 숫자가 있습니다: {', '.join(dict.fromkeys(loose))} — "
+                "그 숫자가 든 자료 문장을 facts에 넣거나 star에서 빼세요(그대로 두면 초안 검사에 걸립니다)"
+            )
         out.append({
             "id": cid,
             "title": title,

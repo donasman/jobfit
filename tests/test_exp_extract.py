@@ -215,6 +215,27 @@ def test_bad_answer_keeps_item_pending(tmp_path, capsys):
     assert yaml.safe_load(project.experiences_file.read_text(encoding="utf-8"))[0]["id"] == "exp-order"  # 카드 파일은 그대로
 
 
+def test_star_numbers_must_be_in_facts(tmp_path, capsys):
+    project = _project(tmp_path)
+    (project.sources_dir / "r.txt").write_text(RESUME, encoding="utf-8")
+    cli.main(["--root", str(tmp_path), "exp", "extract"])
+    prompt = exp_extract.pending_items(project)[0].prompt.read_text(encoding="utf-8")
+    assert "star에 숫자를 쓰면 그 숫자가 나온 자료 표기를 facts에도 넣습니다" in prompt
+    answer = tmp_path / "a.txt"
+    answer.write_text(
+        '- id: exp-batch\n  title: 결제 알림 배치 개선\n'
+        '  star: {situation: "", task: "", action: 하루 3만 건 알림을 옮김, result: 처리 시간 70% 단축}\n'
+        "  facts: []\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+    assert cli.main(["--root", str(tmp_path), "accept", "exp-extract", "--file", str(answer)]) == 0
+    out = capsys.readouterr().out
+    assert "exp-batch: star에 facts에 없는 숫자가 있습니다: 3만 건" in out  # 원문에 있는데 facts에 빠짐
+    assert "star에 자료 원문에 없는 숫자가 있습니다" in out  # 70%는 원문에도 없음 — 따로 알림
+    assert "70%" not in out.split("star에 facts에 없는 숫자가 있습니다:")[1].split("\n")[0]
+
+
 def test_append_to_empty_list_file(tmp_path):
     project = _project(tmp_path)
     project.experiences_file.write_text("# 내 카드\n[]\n", encoding="utf-8")
