@@ -31,7 +31,7 @@ def test_proxy_error_points_to_running_on_this_pc(tmp_path, monkeypatch):
     result = fetcher.fetch_job(URL, derive(URL), tmp_path / "job")
     assert not result.ok and result.network
     assert result.error == "인터넷 연결 문제로 받지 못했습니다(ProxyError)"
-    assert "start.bat 2번" in result.next_hint
+    assert "start.bat 3번(공고 처리 진행)" in result.next_hint
     assert result.notes == []  # 받지 못했으면 '상세요강을 따로 받았다' 같은 설명을 남기지 않는다
 
 
@@ -50,6 +50,7 @@ def test_network_failure_reaches_the_user(tmp_path, capsys, monkeypatch):
     out = capsys.readouterr().out
     block = out.split(HEADER, 1)[1]
     assert "공고 1개를 이 환경에서 받지 못했습니다(인터넷 연결 문제: 예시컴퍼니)" in block
-    assert "start.bat 을 열고 2번" in block
+    assert "이 PC에서 start.bat 3번(공고 처리 진행)을 한 번 실행해 주세요" in block
+    assert "에이전트에게 보낼 말" in block
     action = pipeline.next_action(Project(tmp_path), State.load(Project(tmp_path).state_file))
-    assert action.command.startswith("start.bat 2번")
+    assert action.command.startswith("start.bat 3번(공고 처리 진행)")

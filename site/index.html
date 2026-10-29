@@ -410,14 +410,14 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
         <ul class="checks">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>Windows 또는 macOS</b></div></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b><a href="https://docs.astral.sh/uv/">uv</a></b><span>Python과 필요한 패키지를 알아서 받습니다. 없으면 <code>start.bat</code>이 설치 명령을 알려 줍니다.</span></div></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>Microsoft Excel</b><span>공고 목록 <code>jobs.xlsx</code>를 편집합니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>엑셀은 없어도 됩니다</b><span>공고와 자소서 문항은 메뉴에서 넣습니다. Excel이 있으면 <code>jobs.xlsx</code>를 직접 고쳐도 됩니다.</span></div></li>
         </ul>
       </div>
       <div class="card">
         <h3>설치</h3>
         <ol class="steps">
           <li><b>zip 받아서 풀기</b><p><a href="https://github.com/donasman/jobfit/releases/latest/download/jobfit.zip">jobfit.zip</a>을 원하는 폴더에 풉니다. 늘 최신 버전이 받아집니다.</p></li>
-          <li><b><code>start.bat</code> 실행 → <span class="kbd">1</span> 처음 설정</b><p>macOS는 <code>./start.sh</code>. <code>jobs.xlsx</code>, <code>me/</code>, <code>sources/</code>, <code>output/</code>이 생깁니다.</p></li>
+          <li><b><code>start.bat</code> 실행 → Enter</b><p>macOS는 <code>./start.sh</code>. 처음 설정을 묻고 <code>jobs.xlsx</code>, <code>me/</code>, <code>sources/</code>, <code>output/</code>을 만듭니다.</p></li>
         </ol>
       </div>
     </div>
@@ -442,9 +442,9 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
         <div>
           <p>경험 카드는 <code>me/experiences.yaml</code>에 경험 하나당 하나씩 들어갑니다. 가장 중요한 건 <b>facts</b> — 확정한 수치와 사실만. 초안에 나오는 숫자는 전부 여기 있어야 합니다. 처음 들어 있는 예시 카드 두 개는 지웁니다.</p>
           <ol class="steps" style="margin-top:18px">
-            <li><b>자료 넣기</b><p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code>에. 메뉴 <span class="kbd">7</span> → <span class="kbd">9</span>로 폴더가 열립니다.</p></li>
-            <li><b>메뉴 <span class="kbd">7</span> → <span class="kbd">4</span> → 웹 채팅에 붙여넣기</b><p>답 전체를 복사해 <span class="kbd">7</span> → <span class="kbd">5</span>. 자료가 길면 조각으로 나뉘니 끝날 때까지 반복합니다.</p></li>
-            <li><b>확인하기</b><p><span class="kbd">7</span> → <span class="kbd">6</span>으로 검사하고, 사실이 맞는 카드는 <code>verified: true</code>로 바꿉니다. 직접 쓰려면 <span class="kbd">7</span> → <span class="kbd">7</span>로 빈 카드를 추가합니다.</p></li>
+            <li><b>자료 넣기</b><p>이력서 · 포트폴리오 · 프로젝트 문서를 <code>sources/</code>에. 메뉴 <span class="kbd">7</span> → <span class="kbd">1</span>로 폴더가 열립니다.</p></li>
+            <li><b>메뉴 <span class="kbd">7</span> → <span class="kbd">7</span> → 웹 채팅에 붙여넣기</b><p>답 전체를 복사해 <span class="kbd">7</span> → <span class="kbd">8</span>. 자료가 길면 조각으로 나뉘니 끝날 때까지 반복합니다.</p></li>
+            <li><b>확인하기</b><p><span class="kbd">7</span> → <span class="kbd">3</span>으로 검사하고, 사실이 맞는 카드는 <code>verified: true</code>로 바꿉니다. 직접 쓰려면 <span class="kbd">7</span> → <span class="kbd">4</span>로 빈 카드를 추가합니다.</p></li>
             <li><b>(선택) 이력서 · 문체</b><p><code>me/resume.yaml</code>에 이력서 항목을, <code>me/samples/</code>에 내가 쓴 자소서를 넣으면 이력서 강조 포인트와 문체 맞추기가 더해집니다.</p></li>
           </ol>
         </div>
@@ -468,14 +468,14 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
 
     <div class="panel" role="tabpanel" id="p-paste" aria-labelledby="t-paste" hidden>
       <ol class="steps">
-        <li><b>공고 적기</b><p><code>jobs.xlsx</code> 공고 시트에 회사명 · 직무 · 링크 · 마감일을 한 줄씩. 엑셀을 닫은 상태라면 <code>uv run jobfit add "링크"</code> 한 줄로도 됩니다(회사명 · 직무 · 마감일을 페이지에서 읽어 넣음).</p></li>
-        <li><b>메뉴 <span class="kbd">2</span> 공고 처리 진행</b><p>공고를 받아 정리하고 AI 단계 앞에서 멈춥니다.</p></li>
-        <li><b>메뉴 <span class="kbd">3</span> 프롬프트 복사 → 웹 채팅에 붙여넣기</b><p>ChatGPT · Claude · Gemini 아무 곳이나.</p></li>
-        <li><b>답 전체 복사 → 메뉴 <span class="kbd">4</span></b><p>검사해서 받아들이고 다음 AI 단계 앞까지 진행합니다. 답 앞뒤의 설명이나 코드블록 표시는 알아서 뗍니다. 형식이 틀리면 재요청 프롬프트를 만들어 주니 다시 3번부터.</p></li>
-        <li><b>3 · 4를 한두 번 더</b><p>공고 분석 → 자소서 초안 → (검사에 걸리면) 수정. 공고 하나에 2~3번입니다.</p></li>
-        <li><b>결과 보기</b><p><code>output/&lt;공고&gt;/report.md</code>와 <code>dashboard.xlsx</code>. 다음 할 일은 메뉴 <span class="kbd">8</span>.</p></li>
+        <li><b>메뉴 <span class="kbd">1</span> 공고 추가</b><p>링크를 넣으면 회사명 · 직무 · 마감일을 페이지에서 읽어 <code>jobs.xlsx</code>에 넣습니다. 엑셀로 공고 시트에 직접 적어도 됩니다.</p></li>
+        <li><b>메뉴 <span class="kbd">3</span> 공고 처리 진행</b><p>공고를 받아 정리하고 AI 단계 앞에서 멈춥니다. 자소서 문항은 메뉴 <span class="kbd">2</span>로 넣습니다.</p></li>
+        <li><b>메뉴 <span class="kbd">9</span> 프롬프트 복사 → 웹 채팅에 붙여넣기</b><p>ChatGPT · Claude · Gemini 아무 곳이나.</p></li>
+        <li><b>답 전체 복사 → 메뉴 <span class="kbd">10</span></b><p>검사해서 받아들이고 다음 AI 단계 앞까지 진행합니다. 답 앞뒤의 설명이나 코드블록 표시는 알아서 뗍니다. 형식이 틀리면 재요청 프롬프트를 만들어 주니 다시 9번부터.</p></li>
+        <li><b>9 · 10을 한두 번 더</b><p>공고 분석 → 자소서 초안 → (검사에 걸리면) 수정. 공고 하나에 2~3번입니다.</p></li>
+        <li><b>결과 보기</b><p><code>output/&lt;공고&gt;/report.md</code>와 <code>dashboard.xlsx</code>. 다음 할 일은 메뉴 <span class="kbd">5</span>.</p></li>
       </ol>
-      <div class="note warn">공고를 못 받는 사이트(화면을 스크립트로 그리는 곳, 로그인이 필요한 곳, 그림 공고)는 브라우저에서 본문을 복사해 메뉴 <span class="kbd">5</span>로 붙여 넣습니다.</div>
+      <div class="note warn">공고를 못 받는 사이트(화면을 스크립트로 그리는 곳, 로그인이 필요한 곳, 그림 공고)는 브라우저에서 본문을 복사해 메뉴 <span class="kbd">4</span>로 붙여 넣습니다.</div>
     </div>
 
     <div class="panel" role="tabpanel" id="p-agent" aria-labelledby="t-agent" hidden>
@@ -496,6 +496,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
         </div>
       </div>
       <p style="margin-top:20px">에이전트는 <code>AGENTS.md</code>대로 <code>uv run jobfit</code> 명령만 쓰고, 프롬프트 파일만 읽고, 답 파일만 씁니다. <code>me/</code>와 공고 원문은 읽지 않고, Notion에는 요청할 때만 올립니다.</p>
+      <div class="note"><b>메뉴와 같이 쓰기</b> — <code>start.bat</code> 메뉴에서 공고를 넣거나 문항을 넣거나 공고를 받으면, 결과 끝에 <b>에이전트에게 보낼 말</b>이 나오고 클립보드에 복사됩니다. 에이전트 창에 붙여 넣으면 이어서 진행합니다. 이 말에는 "이전 대화에서 본 상태는 믿지 말고 <code>jobfit next</code>부터 다시"가 들어 있어, 에이전트가 앞선 대화의 기억으로 답하지 않습니다.</div>
       <div class="note">Claude Code와 Codex 둘 다 "새 공고 처리해줘" 한 마디로 실제 공고 1건(문항 3개)을 분석 → 매칭 → 초안 → report.md까지 처리하고, 금지 파일을 한 번도 읽지 않는 것을 실행 로그로 확인했습니다.</div>
     </div>
   </div>

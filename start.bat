@@ -1,5 +1,5 @@
 @echo off
-rem jobfit 붙여넣기 모드 메뉴 (Windows). 무료 웹 채팅만 쓰는 사용자용.
+rem jobfit 메뉴 (Windows). 화면은 jobfit menu(파이썬)가 그린다 — start.sh 와 같은 메뉴.
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -11,72 +11,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-set empty=0
-
-:menu
-rem 입력이 끊기면(파이프·자동 실행) 빈 입력이 이어진다 — 20번 연속이면 끝낸다
-if %empty% GEQ 20 exit /b 1
-echo.
-echo [jobfit]
-echo  1. 처음 설정 (jobs.xlsx, 폴더 생성)
-echo  2. 공고 처리 진행 (AI 단계 전까지 자동 실행)
-echo  3. AI 프롬프트 복사 (클립보드)
-echo  4. AI 응답 붙여넣기 (클립보드에서 저장·검증 후 이어서 진행)
-echo  5. 공고 본문 붙여넣기 (수집 실패한 공고용)
-echo  6. 결과 폴더 열기
-echo  7. 문체·경험 카드
-echo  8. 다음 할 일 보기
-echo  9. jobs.xlsx 검사
-echo  0. 종료
-rem 빈 Enter 로 앞 번호가 다시 실행되지 않게 비우고 묻는다
-set "c="
-set /p "c=번호: "
-if not defined c (set /a empty+=1) else (set empty=0)
-if "%c%"=="1" uv run jobfit init
-if "%c%"=="2" uv run jobfit run
-if "%c%"=="3" uv run jobfit prep --copy
-if "%c%"=="4" (uv run jobfit accept --paste && uv run jobfit run)
-if "%c%"=="5" goto paste
-if "%c%"=="6" start "" "%~dp0output"
-if "%c%"=="7" goto me
-if "%c%"=="8" uv run jobfit next
-if "%c%"=="9" uv run jobfit check
-if "%c%"=="0" exit /b 0
-goto menu
-
-:paste
-set "j="
-set /p "j=공고 (회사명 또는 공고번호): "
-echo 공고 본문을 복사한 뒤 Enter 를 누르세요.
-pause >nul
-uv run jobfit posting --job "%j%" --from-clipboard
-goto menu
-
-:me
-if %empty% GEQ 20 exit /b 1
-echo.
-echo [문체 · 경험 카드]
-echo  1. 문체 수치 계산 (me\samples 의 내 자소서)
-echo  2. 문체 규칙 프롬프트 복사 (클립보드)
-echo  3. 문체 규칙 답 붙여넣기 (클립보드)
-echo  4. 경험 카드 만들기: 프롬프트 복사 (sources 폴더의 내 자료로)
-echo  5. 경험 카드 만들기: AI 답 붙여넣기
-echo  6. 경험 카드 검사
-echo  7. 빈 경험 카드 추가
-echo  8. me 폴더 열기
-echo  9. sources 폴더 열기 (이력서·포트폴리오 넣는 곳)
-echo  0. 돌아가기
-set "m="
-set /p "m=번호: "
-if not defined m (set /a empty+=1) else (set empty=0)
-if "%m%"=="1" uv run jobfit style stats
-if "%m%"=="2" uv run jobfit prep style-rules --copy
-if "%m%"=="3" uv run jobfit accept style-rules --paste
-if "%m%"=="4" uv run jobfit exp extract --copy
-if "%m%"=="5" uv run jobfit accept exp-extract --paste
-if "%m%"=="6" uv run jobfit exp check
-if "%m%"=="7" uv run jobfit exp new
-if "%m%"=="8" start "" "%~dp0me"
-if "%m%"=="9" start "" "%~dp0sources"
-if "%m%"=="0" goto menu
-goto me
+uv run jobfit menu
+if errorlevel 1 pause

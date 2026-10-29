@@ -87,7 +87,10 @@ def test_no_questions_ends_at_report_with_need_questions(tmp_path, capsys):
     assert match["score"] is not None and "gaps" not in match
     capsys.readouterr()
     cli.main(["--root", str(tmp_path), "next"])
-    assert "문항 시트에 입력" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # 사람은 메뉴나 문항 시트(공고 칸에 무엇을 적는지까지), 에이전트는 사용자가 준 원문을 question add 로
+    assert "start.bat 2번(문항 넣기)나 jobs.xlsx 문항 시트(공고 칸에 '예시랩')에 넣고 jobfit run" in out
+    assert f"jobfit question add --job {KEY}" in out
 
 
 def test_report_sections(tmp_path):

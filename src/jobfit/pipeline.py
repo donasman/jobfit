@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from jobfit import jobkey
+from jobfit import jobkey, menunum
 from jobfit.ai import analyze, draft, exp_extract
 from jobfit.clean.posting import FILE_POSTING, clean_job
 from jobfit.dashboard import DashboardBusy, build_dashboard
@@ -38,7 +38,7 @@ from jobfit.state import (
 IMPLEMENTED = {"fetch", "clean", "analyze", "match", "report", "draft"}
 # AI 단계 -> 프롬프트 준비 함수
 AI_PREPARERS = {"analyze": analyze.prepare, "draft": draft.prepare}
-AI_HINT = "AI 프롬프트 복사 (메뉴 3 · jobfit prep --copy) → 웹 채팅 → 답 복사 → 메뉴 4 (jobfit accept --paste)"
+AI_HINT = f"AI 프롬프트 복사 (메뉴 {menunum.PROMPT} · jobfit prep --copy) → 웹 채팅 → 답 복사 → 메뉴 {menunum.ANSWER} (jobfit accept --paste)"
 
 PASTE_HINT = "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
 
@@ -149,6 +149,9 @@ def _apply_task(job: Job, task: str, project: Project) -> None:
 
 def _match_job_ref(ref: str, jobs) -> Job | None:
     ref = ref.strip()
+    by_key = [j for j in jobs if j.key == ref]  # 공고키(jobkorea:50073391)로 적어도 알아듣는다
+    if by_key:
+        return by_key[0]
     company, _, title = (p.strip() for p in ref.partition(" / "))
     exact = [j for j in jobs if j.company == company and (not title or j.title == title)]
     if len(exact) == 1:
@@ -321,7 +324,7 @@ def next_action(project: Project, state: State) -> Action:
     # 경험 카드가 매칭에 쓰이므로, 같은 급이면 자료 → 공고 순서로 안내한다
     exp = _exp_action(project)
     if not state.jobs:
-        return exp or Action(kind="edit", message='jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>" 로 추가한 뒤 jobfit run (메뉴 2)', command="jobfit run")
+        return exp or Action(kind="edit", message=f'jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>"(메뉴 {menunum.ADD})로 추가한 뒤 jobfit run(메뉴 {menunum.RUN})', command="jobfit run")
     actions = ([exp] if exp else []) + [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
     if actions:
         return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 앞의 것(자료, 그다음 jobs.xlsx 위쪽 공고)
@@ -361,7 +364,7 @@ def response_name(job: Job, step: str) -> str:
 def _job_action(project: Project, job: Job) -> Action | None:
     if job.status == STATUS_ERROR:
         if NETWORK_ERROR_MARK in job.error:  # 붙여넣기보다 이 PC에서 한 번 받는 게 먼저
-            return Action(kind="paste", message=f"{job.company}: {job.error}. {job.next_hint}", command="start.bat 2번 (이 PC에서) — 또는 jobfit run", job=job)
+            return Action(kind="paste", message=f"{job.company}: {job.error}. {job.next_hint}", command=f"{menunum.at(menunum.RUN, '공고 처리 진행')} (이 PC에서) — 또는 jobfit run", job=job)
         return Action(kind="paste", message=f"{job.company}: {job.error}. {job.next_hint}", command=f"jobfit posting --job {job.key} --from-clipboard", job=job)
     stale = _stale_reason(project, job)
     if stale:
@@ -381,7 +384,11 @@ def _job_action(project: Project, job: Job) -> Action | None:
         return Action(kind="ai", message=message, command=f"jobfit prep {step} --job {job.key} --copy", job=job)
     if step == "draft" and job.status == STATUS_NEED_QUESTIONS:
         report = project.rel(project.job_dir(job.key) / FILE_REPORT)
-        message = f"{job.company}: 공고에 자소서 문항이 없습니다. {report} 에서 매칭·강조 포인트를 보세요. 문항이 있으면 jobs.xlsx 문항 시트에 입력하고 jobfit run"
+        message = (
+            f"{job.company}: 공고에 자소서 문항이 없습니다. {report} 에서 매칭·강조 포인트를 보세요. 문항이 있으면 "
+            f"{menunum.at(menunum.QUESTIONS, '문항 넣기')}나 jobs.xlsx 문항 시트(공고 칸에 '{job.company}')에 넣고 jobfit run. "
+            f'사용자가 문항 원문을 주면 에이전트가 jobfit question add --job {job.key} --text "<문항>" [--limit 글자수]'
+        )
         return Action(kind="edit", message=message, command="jobfit run", job=job)
     if step in IMPLEMENTED:
         return Action(kind="run", message=f"{job.company}: {step} 단계부터 실행", command="jobfit run", job=job)

@@ -16,6 +16,7 @@ from urllib.parse import urljoin, urlsplit
 import requests
 from bs4 import BeautifulSoup
 
+from jobfit import menunum
 from jobfit.fetch import robots
 from jobfit.fetch.sites import FetchPlan, plan_for
 from jobfit.jobkey import JobKey
@@ -32,8 +33,8 @@ FILE_META = "fetch.json"
 PASTE_HINT = "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
 # 프록시·DNS·SSL·연결 실패 — 사이트가 아니라 실행 환경(에이전트의 가상 머신·샌드박스)의 인터넷이 막힌 경우가 많다
 NETWORK_HINT = (
-    "이 PC에서 start.bat 2번(공고 처리 진행)을 한 번 실행해 공고를 받아 오세요"
-    " — 에이전트가 도는 가상 머신·샌드박스는 인터넷이 막혀 있을 수 있습니다. 그래도 안 되면 공고 본문 붙여넣기(start.bat 5번)"
+    f"이 PC에서 {menunum.at(menunum.RUN, '공고 처리 진행')}을 한 번 실행해 공고를 받아 오세요"
+    f" — 에이전트가 도는 가상 머신·샌드박스는 인터넷이 막혀 있을 수 있습니다. 그래도 안 되면 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}"
 )
 NETWORK_ERROR_MARK = "인터넷 연결 문제로 받지 못했습니다"
 

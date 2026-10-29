@@ -1,7 +1,7 @@
-"""jobs.xlsx에 공고 한 줄 추가 — `jobfit add` 전용. 스크립트가 jobs.xlsx에 쓰는 유일한 곳이다.
+"""jobs.xlsx에 줄 추가 — `jobfit add`(공고)·`jobfit question add`(문항) 전용. 스크립트가 jobs.xlsx에 쓰는 유일한 곳이다.
 
 사용자가 명시적으로 부를 때만 쓴다. 엑셀이 열려 있으면 쓰지 않는다. 쓰기 전에 백업을 남긴다.
-공고 시트의 비어 있는 첫 행에, 사용자 열 값만 쓴다. 결정·작업은 비워 둔다.
+비어 있는 첫 행에, 사용자 열 값만 쓴다. 공고 시트의 결정·작업은 비워 둔다.
 """
 
 from __future__ import annotations
@@ -15,7 +15,17 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from jobfit.excel.workbook import JOB_DISPLAY_HEADER, JOB_HEADERS, MAX_ROWS, SHEET_JOBS, display_formula, ensure_validations, header_letters
+from jobfit.excel.workbook import (
+    JOB_DISPLAY_HEADER,
+    JOB_HEADERS,
+    MAX_ROWS,
+    QUESTION_HEADERS,
+    SHEET_JOBS,
+    SHEET_QUESTIONS,
+    display_formula,
+    ensure_validations,
+    header_letters,
+)
 
 BACKUP_KEEP = 10
 
@@ -31,18 +41,12 @@ def lock_files(path: Path) -> list[Path]:
 
 def append_job_row(path: Path, backup_dir: Path, company: str, title: str = "", url: str = "", deadline: str = "", memo: str = "") -> int:
     """추가한 행 번호를 돌려준다."""
-    if any(p.exists() for p in lock_files(path)):
-        raise ExcelBusy("jobs.xlsx가 열려 있습니다. 엑셀을 닫고 다시 실행하세요")
-    backup(path, backup_dir)
-    with warnings.catch_warnings():
-        # 엑셀이 저장한 확장 형식(목록 검사 등)을 openpyxl이 버린다는 경고 — ensure_validations가 다시 단다
-        warnings.simplefilter("ignore", UserWarning)
-        wb = load_workbook(path)
+    wb = _open_for_write(path, backup_dir)
     ws = wb[SHEET_JOBS]
     cols = header_letters(ws)
     if "회사명" not in cols:
         raise ValueError("공고 시트에 '회사명' 헤더가 없습니다. 헤더 이름을 되돌려 주세요")
-    row = _first_empty_row(ws, cols)
+    row = _first_empty_row(ws, [cols[h] for h in JOB_HEADERS if h in cols])
     values = {
         "회사명": company,
         "직무": title,
@@ -63,6 +67,39 @@ def append_job_row(path: Path, backup_dir: Path, company: str, title: str = "", 
     return row
 
 
+def append_question_rows(path: Path, backup_dir: Path, job_ref: str, questions: list[tuple[str, int | None, bool]], first_number: int) -> list[int]:
+    """문항 시트에 (문항, 글자수, 공백 포함) 여러 개를 한 번에 — 백업도 한 번. 추가한 행 번호들."""
+    wb = _open_for_write(path, backup_dir)
+    ws = wb[SHEET_QUESTIONS]
+    cols = header_letters(ws)
+    for need in ("공고", "문항"):
+        if need not in cols:
+            raise ValueError(f"문항 시트에 '{need}' 헤더가 없습니다. 헤더 이름을 되돌려 주세요")
+    letters = [cols[h] for h in QUESTION_HEADERS if h in cols]
+    rows: list[int] = []
+    row = _first_empty_row(ws, letters)
+    for i, (text, limit, spaces) in enumerate(questions):
+        values = {"공고": job_ref, "번호": first_number + i, "문항": text, "글자수": limit, "공백포함": "포함" if spaces else "제외"}
+        for name, value in values.items():
+            if name in cols and value not in ("", None):
+                ws[f"{cols[name]}{row}"].value = value
+        rows.append(row)
+        row = _first_empty_row(ws, letters, row + 1)
+    ensure_validations(wb)
+    _save_atomic(wb, path)
+    return rows
+
+
+def _open_for_write(path: Path, backup_dir: Path):
+    if any(p.exists() for p in lock_files(path)):
+        raise ExcelBusy("jobs.xlsx가 열려 있습니다. 엑셀을 닫고 다시 실행하세요")
+    backup(path, backup_dir)
+    with warnings.catch_warnings():
+        # 엑셀이 저장한 확장 형식(목록 검사 등)을 openpyxl이 버린다는 경고 — ensure_validations가 다시 단다
+        warnings.simplefilter("ignore", UserWarning)
+        return load_workbook(path)
+
+
 def backup(path: Path, backup_dir: Path) -> Path:
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -77,10 +114,9 @@ def backup(path: Path, backup_dir: Path) -> Path:
     return dst
 
 
-def _first_empty_row(ws, cols: dict[str, str]) -> int:
+def _first_empty_row(ws, letters: list[str], start: int = 2) -> int:
     """사용자 열이 전부 빈 첫 행. 공고표시 수식 열은 보지 않는다(500행까지 차 있다)."""
-    letters = [cols[h] for h in JOB_HEADERS if h in cols]
-    for r in range(2, ws.max_row + 2):
+    for r in range(start, ws.max_row + 2):
         if all(ws[f"{L}{r}"].value in (None, "") for L in letters):
             return r
     return ws.max_row + 1

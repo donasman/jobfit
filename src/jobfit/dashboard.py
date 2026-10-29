@@ -15,6 +15,7 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from jobfit import menunum
 from jobfit.drafts import lint_summary, load_lint
 from jobfit.excel.append import lock_files
 from jobfit.match import load_analysis, load_match
@@ -134,7 +135,7 @@ def _next(job: Job) -> str:
     if job.task_seen:
         return "작업 칸을 비워 주세요"
     if job.status == STATUS_AI:
-        return job.next_hint or "AI 프롬프트 복사 (메뉴 3)"
+        return job.next_hint or f"AI 프롬프트 복사 (메뉴 {menunum.PROMPT})"
     if job.status == STATUS_NEED_QUESTIONS:
         return "문항 시트에 문항 입력, 또는 결정 열에서 지원 여부 결정"
     if job.status == STATUS_REVIEW:

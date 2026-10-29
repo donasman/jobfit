@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from jobfit import __version__
-from jobfit import jobkey, pipeline
+from jobfit import jobkey, menunum, pipeline
 from jobfit.excel.workbook import create_jobs_workbook
 from jobfit.paths import Project
 from jobfit.state import STATUS_AI, STATUS_REVIEW, STATUS_RUNNING, State
@@ -138,6 +138,52 @@ def cmd_add(project: Project, args) -> int:
         print("  페이지에서 읽은 값: " + ", ".join(filled) + " — 틀리면 jobs.xlsx에서 고치세요")
     print("다음: jobfit run")
     return 0
+
+
+def cmd_question_add(project: Project, args) -> int:
+    """jobs.xlsx 문항 시트에 문항 추가 — 엑셀이 없어도 넣을 수 있게. 문항은 받은 원문 그대로 쓴다."""
+    _require_init(project)
+    from jobfit.excel.append import ExcelBusy, append_question_rows
+
+    state = State.load(project.state_file)
+    report = pipeline.sync_in(project, state)
+    job = _pick_job(state, args.job)
+    if job is None:
+        state.save(project.state_file)
+        return 1
+    existing = report.questions.get(job.key, [])
+    have = {" ".join(q.text.split()) for q in existing}
+    limits = [n if n and n > 0 else None for n in (args.limit or [])]
+    questions = []
+    for i, raw in enumerate(args.text):
+        text = raw.strip()
+        if not text:
+            continue
+        if " ".join(text.split()) in have:
+            print(f"이미 있는 문항이라 건너뜁니다: {text}")
+            continue
+        questions.append((text, limits[i] if i < len(limits) else None, not args.no_spaces))
+    if not questions:
+        print("넣을 문항이 없습니다")
+        return 0 if existing else 2
+    ref = f"{job.company} / {job.title}" if job.title else job.company
+    first = max([q.number for q in existing if q.number > 0], default=len(existing)) + 1
+    try:
+        rows = append_question_rows(project.jobs_xlsx, project.backups_dir, ref, questions, first)
+    except ExcelBusy as e:
+        print(str(e))
+        return 1
+    print(f"추가: 문항 시트 {rows[0]}" + (f"~{rows[-1]}" if len(rows) > 1 else "") + f"행 — {job.company} 문항 {len(rows)}개")
+    for n, (text, limit, spaces) in enumerate(questions, start=first):
+        print(f"  {n}. {text}" + (f" ({limit}자, 공백 {'포함' if spaces else '제외'})" if limit else ""))
+    print("다음: jobfit run")
+    return 0
+
+
+def cmd_menu(project: Project, args) -> int:
+    from jobfit.menu import run_menu
+
+    return run_menu(project)
 
 
 def cmd_check(project: Project, args) -> int:
@@ -307,7 +353,7 @@ def cmd_posting(project: Project, args) -> int:
 
 
 def cmd_prep(project: Project, args) -> int:
-    """AI 프롬프트 만들기. --copy 면 클립보드에 복사(붙여넣기 모드 메뉴 3)."""
+    """AI 프롬프트 만들기. --copy 면 클립보드에 복사(메뉴의 AI 프롬프트 복사)."""
     _require_init(project)
     from jobfit.ai.promptfile import copy_to_clipboard
     from jobfit.match import load_match
@@ -356,7 +402,7 @@ def cmd_prep(project: Project, args) -> int:
 
 
 def cmd_accept(project: Project, args) -> int:
-    """AI 답 받아들이기. --paste 면 클립보드에서(붙여넣기 모드 메뉴 4), 아니면 답 파일에서(에이전트 모드)."""
+    """AI 답 받아들이기. --paste 면 클립보드에서(메뉴의 AI 답 붙여넣기), 아니면 답 파일에서(에이전트 모드)."""
     _require_init(project)
     from jobfit.ai import analyze
 
@@ -400,7 +446,7 @@ def cmd_accept(project: Project, args) -> int:
         print("다음: jobfit run")
         rc = 0
     else:
-        job.status, job.next_hint = STATUS_AI, "재요청 프롬프트 복사 (메뉴 3 · jobfit prep --copy)"
+        job.status, job.next_hint = STATUS_AI, f"재요청 프롬프트 복사 (메뉴 {menunum.PROMPT} · jobfit prep --copy)"
         print(f"{job.company}: 답을 받아들이지 못했습니다" + (f" ({result.attempt}번째)" if result.attempt else ""))
         for e in result.errors:
             print(f"  - {e}")
@@ -420,7 +466,7 @@ def _accept_draft(project: Project, job, raw: str | None) -> int:
     phase = job.steps.get("draft", {}).get("phase", "draft")
     result = draft.accept(project, job, raw)
     if not result.ok:
-        job.status, job.next_hint = STATUS_AI, "재요청 프롬프트 복사 (메뉴 3 · jobfit prep --copy)"
+        job.status, job.next_hint = STATUS_AI, f"재요청 프롬프트 복사 (메뉴 {menunum.PROMPT} · jobfit prep --copy)"
         print(f"{job.company}: 초안 답을 받아들이지 못했습니다" + (f" ({result.attempt}번째)" if result.attempt else ""))
         for e in result.errors:
             print(f"  - {e}")
@@ -430,7 +476,7 @@ def _accept_draft(project: Project, job, raw: str | None) -> int:
         return 1
     if result.revise_path:
         failing = [ql for ql in result.lints if ql.errors]
-        job.status, job.next_hint = STATUS_AI, "수정 프롬프트 복사 (메뉴 3 · jobfit prep --copy)"
+        job.status, job.next_hint = STATUS_AI, f"수정 프롬프트 복사 (메뉴 {menunum.PROMPT} · jobfit prep --copy)"
         print(f"{job.company}: 초안을 받았습니다. 검사에 걸린 {len(failing)}개 문항만 한 번 고쳐 받습니다")
         _print_lints(result.lints)
         print(f"수정 프롬프트: {project.rel(result.revise_path)}")
@@ -533,7 +579,7 @@ def _accept_exp(project: Project, args) -> int:
     for w in result.warnings:
         print(f"  ! {w}")
     if result.remaining:
-        print(f"남은 자료 조각 {result.remaining}개 — 다음: jobfit prep exp-extract --copy (메뉴 3)")
+        print(f"남은 자료 조각 {result.remaining}개 — 다음: jobfit prep exp-extract --copy (메뉴 {menunum.PROMPT})")
     else:
         files = exp_extract.source_files(project)
         made = sum(len(i.get("cards", [])) for i in files.values())
@@ -665,7 +711,7 @@ def _copy_prompt(path: Path, copy: bool, copier) -> int:
     if not copier(path.read_text(encoding="utf-8")):
         print("클립보드에 복사하지 못했습니다. 위 파일을 메모장으로 열어 전체 복사하세요")
         return 1
-    print("클립보드에 복사했습니다. 웹 채팅에 붙여넣고, 답이 나오면 전체를 복사한 뒤  jobfit accept --paste (메뉴 4)")
+    print(f"클립보드에 복사했습니다. 웹 채팅에 붙여넣고, 답이 나오면 전체를 복사한 뒤  jobfit accept --paste (메뉴 {menunum.ANSWER})")
     return 0
 
 
@@ -849,6 +895,17 @@ def _build_parser() -> argparse.ArgumentParser:
     exp_new = exp_sub.add_parser("new", help="빈 카드 하나 추가")
     exp_new.add_argument("--id", help="카드 id (기본 exp-<번호>)")
     exp_new.set_defaults(func=cmd_exp)
+
+    question = sub.add_parser("question", help="자소서 문항 (jobs.xlsx 문항 시트)")
+    question_sub = question.add_subparsers(dest="question_command", required=True)
+    q_add = question_sub.add_parser("add", help="문항 추가 — 엑셀 없이. 문항은 원문 그대로")
+    q_add.add_argument("--job", required=True, help="공고키·회사명")
+    q_add.add_argument("--text", action="append", required=True, help="문항 원문 (여러 개면 --text 를 반복)")
+    q_add.add_argument("--limit", action="append", type=int, help="글자수 (문항 순서대로, 0이면 제한 없음)")
+    q_add.add_argument("--no-spaces", action="store_true", help="글자수를 공백 빼고 센다")
+    q_add.set_defaults(func=cmd_question_add)
+
+    sub.add_parser("menu", help="start.bat·start.sh 메뉴 (사람용 화면)").set_defaults(func=cmd_menu)
 
     posting = sub.add_parser("posting", help="공고 본문 붙여넣기(수집 실패한 공고용)")
     posting.add_argument("--job", required=True, help="공고키·공고번호·회사명")
