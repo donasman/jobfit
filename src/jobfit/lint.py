@@ -110,9 +110,9 @@ def lint_answer(
             continue
         seen.add(tok.raw)
         if not same_value(tok, fact_tokens):
-            add(tok.severity(), "number", f"'{tok.raw}'는 경험 카드 facts에 없는 숫자입니다")
+            add(tok.severity(), "number", f"'{tok.raw}'은(는) 경험 카드 facts에 없는 숫자입니다")
         elif unverified and not same_value(tok, verified_tokens):
-            add("경고", "number", f"'{tok.raw}'는 사실 확인 전(verified: false) 카드의 숫자입니다 — 확인 후 쓰세요")
+            add("경고", "number", f"'{tok.raw}'은(는) 사실 확인 전(verified: false) 카드의 숫자입니다 — 확인 후 쓰세요")
 
     # 연도 — 경험 기간·facts에 있는 연도면 통과
     known_years = {int(y) for p in (periods or []) for y in _YEAR.findall(str(p))} | {int(y) for f in facts for y in _YEAR.findall(f)}
@@ -120,7 +120,7 @@ def lint_answer(
         lo, hi = min(known_years), max(known_years)
         for y in sorted(set(found.years)):
             if not lo <= y <= hi:
-                add("경고", "year", f"연도 {y}가 경험 기간({lo}~{hi})과 맞지 않습니다")
+                add("경고", "year", f"경험 기간({lo}~{hi}) 밖의 연도입니다: {y}")
 
     # 연락처
     if _EMAIL.search(body) or _PHONE.search(body):
@@ -144,5 +144,5 @@ def lint_answer(
             add("경고", "style", f"문장당 쉼표 {commas:.1f}개 — 샘플({avg}개)보다 많습니다")
         for ch in SPECIAL_CHARS:
             if stats.get("special", {}).get(ch, 1) == 0 and ch in body:
-                add("경고", "style", f"샘플에서 쓰지 않는 기호 '{ch}'를 썼습니다")
+                add("경고", "style", f"샘플에서 쓰지 않는 기호를 썼습니다: '{ch}'")
     return result

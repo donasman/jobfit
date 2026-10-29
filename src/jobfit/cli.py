@@ -203,7 +203,7 @@ def cmd_dashboard(project: Project, args) -> int:
 
 def cmd_exp(project: Project, args) -> int:
     from jobfit.clean.keywords import KeywordDict
-    from jobfit.experiences import FILE_HEADER, check_cards, load_cards, new_card_text
+    from jobfit.experiences import UNVERIFIED_NOTE, FILE_HEADER, check_cards, example_ids, load_cards, new_card_text
 
     if not project.me_dir.exists():
         print("me/ 폴더가 없습니다. 먼저  jobfit init")
@@ -215,7 +215,7 @@ def cmd_exp(project: Project, args) -> int:
     if args.exp_command == "new":
         card_id = args.id or f"exp-{len(cards) + 1}"
         if any(str(c.get("id")) == card_id for c in cards):
-            print(f"id '{card_id}'가 이미 있습니다. --id 로 다른 이름을 주세요")
+            print(f"이미 있는 id입니다: '{card_id}'. --id 로 다른 이름을 주세요")
             return 2
         if problems:
             print(f"{problems[0]} — 고친 뒤 다시 실행하세요")
@@ -224,7 +224,7 @@ def cmd_exp(project: Project, args) -> int:
         if not cards and existing.strip() in ("", "[]"):
             existing = FILE_HEADER
         path.write_text(existing.rstrip("\n") + "\n" + new_card_text(card_id), encoding="utf-8")
-        print(f"빈 카드 '{card_id}'를 {project.rel(path)} 맨 아래에 넣었습니다. 채운 뒤  jobfit exp check")
+        print(f"{project.rel(path)} 맨 아래에 빈 카드를 넣었습니다(id: {card_id}). 채운 뒤  jobfit exp check")
         return 0
 
     # check
@@ -235,12 +235,21 @@ def cmd_exp(project: Project, args) -> int:
         print(f"  [오류] {p}")
     if problems:
         return 1
-    issues = check_cards(cards, KeywordDict.load(project.data_dir))
-    for issue in issues:
+    examples = example_ids(cards, project.me_example_dir / "experiences.yaml")
+    issues = check_cards(cards, KeywordDict.load(project.data_dir), examples)
+    shown = [i for i in issues if i.kind != "unverified"]
+    unverified = list(dict.fromkeys(i.card for i in issues if i.kind == "unverified"))
+    for issue in shown:
         print(f"  {issue}")
-    errors = sum(1 for i in issues if i.level == "오류")
-    warnings = len(issues) - errors
-    print(f"카드 {len(cards)}개 · 오류 {errors} · 경고 {warnings}" + ("" if issues else " — 문제없음"))
+    if unverified:
+        ids = ", ".join(unverified[:5]) + (f" 외 {len(unverified) - 5}개" if len(unverified) > 5 else "")
+        print(f"  [확인 전] 카드 {len(unverified)}개 — {UNVERIFIED_NOTE}: {ids}")
+    errors = sum(1 for i in shown if i.level == "오류")
+    warnings = len(shown) - errors
+    summary = f"카드 {len(cards)}개 · 오류 {errors} · 경고 {warnings}" + (f" · 확인 전 {len(unverified)}" if unverified else "")
+    print(summary + ("" if issues else " — 문제없음"))
+    if examples:
+        print(f"예시 카드 {len(examples)}개를 지우세요: {', '.join(examples)}  ({project.rel(path)})")
     return 1 if errors else 0
 
 
@@ -694,7 +703,7 @@ def cmd_usage(project: Project, args) -> int:
 
 
 def cmd_unimplemented(project: Project, args) -> int:
-    print(f"'{args.command}'는 {UNIMPLEMENTED[args.command]}에서 구현됩니다")
+    print(f"'{args.command}' 명령은 {UNIMPLEMENTED[args.command]}에서 구현됩니다")
     return 2
 
 

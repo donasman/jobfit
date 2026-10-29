@@ -1,6 +1,6 @@
 [project]
 name = "jobfit"
-version = "0.2.0"
+version = "0.2.1"
 description = "공고 기반 자소서 파이프라인 — 스크립트가 보장하고 AI는 판단만 한다"
 readme = "README.md"
 authors = [

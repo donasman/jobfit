@@ -157,7 +157,7 @@ def test_extract_flow(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "이미 있는 카드와 같은 경험이라 건너뜀: 주문 조회 API 개선 프로젝트" in out
     assert "처리 시간 70% 단축" in out and "자료 원문에 없는 숫자" in out
-    assert "'리더십'" in out and "모두 카드로 만들었습니다" in out
+    assert "문항 유형이 아니라서 뺐습니다 — 리더십" in out and "모두 카드로 만들었습니다" in out
 
     cards, problems = load_cards(project.experiences_file)
     assert problems == []
@@ -280,3 +280,19 @@ def test_paste_goes_to_the_prompt_shown_last(tmp_path, capsys):
     card.write_text('- id: exp-batch\n  title: 결제 알림 배치 개선\n  facts: ["하루 3만 건 알림"]\n', encoding="utf-8")
     assert cli.main(["--root", str(tmp_path), "accept", "--file", str(card)]) == 0
     assert "경험 카드 1개" in capsys.readouterr().out
+
+
+def test_accept_reminds_about_example_cards(tmp_path, capsys):
+    import shutil
+    from pathlib import Path
+
+    shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
+    assert cli.main(["--root", str(tmp_path), "init"]) == 0
+    project = Project(tmp_path)
+    (project.sources_dir / "r.txt").write_text(RESUME, encoding="utf-8")
+    cli.main(["--root", str(tmp_path), "exp", "extract"])
+    card = tmp_path / "c.txt"
+    card.write_text('- id: exp-batch\n  title: 결제 알림 배치 개선\n  facts: ["하루 3만 건 알림"]\n', encoding="utf-8")
+    capsys.readouterr()
+    assert cli.main(["--root", str(tmp_path), "accept", "exp-extract", "--file", str(card)]) == 0
+    assert "예시 카드 2개가 아직 있습니다(exp-order-api-latency, exp-team-onboarding-doc)" in capsys.readouterr().out

@@ -582,6 +582,17 @@ jobfit discover [--plan] / discover parse                                       
 | 걸린 것 | ① 처음 연 폴더라 `.claude/settings.json` allow가 무시됨(신뢰 창 전) → 첫 실행은 `uv run jobfit next`부터 거부되고 에이전트가 우회 없이 멈춤. ② Windows에서 PowerShell 도구로 먼저 실행 → `PowerShell(...)` 허용 규칙 필요. ③ 글자수를 직접 세려다 거부됨. ④ 지침 8번대로 연결된 Notion에 쓰려다 거부됨 | ① 사용자 설정의 기본 모델이 ChatGPT 계정에서 지원되지 않아 첫 실행 실패(jobfit과 무관, `-m`으로 지정해 재실행). ② 샌드박스가 사용자 uv 캐시 폴더에 못 써서 첫 명령 실패 → 에이전트가 스스로 `UV_CACHE_DIR`을 작업 폴더로 돌려 해결 |
 | 반영 | allow에 `PowerShell(uv run jobfit:*)`·답 파일 `Edit(...)` 추가, README에 신뢰 창 안내, AGENTS: 명령은 `uv run jobfit`만·글자수는 accept가 센다·**Notion은 요청할 때만**·막히면 멈춤 | AGENTS·README에 `UV_CACHE_DIR=.uv-cache` 대처, `.uv-cache/` gitignore |
 
+**경험 카드 뽑기 검증 (2026-10-29, v0.2.0)** — 사용자가 배포 zip을 새 폴더에 풀고 실제 이력서·포트폴리오 PDF 2개를 `sources/`에 넣은 뒤, Claude 데스크톱 앱에서 "sources에 넣은 내 자료로 경험 카드 만들어줘".
+
+| | Claude 데스크톱 앱 (가상 머신 작업 모드) |
+|---|---|
+| 결과 | `exp extract` → 조각 5개(이력서 1, 포트폴리오 4) 모두 첫 답에 accept, 카드 31개, 약 6분. 프롬프트 5,010~6,405자 |
+| 품질 | 한글 PDF 글자가 깨끗하게 꺼내짐. facts의 숫자가 모두 원문에 있어 빠진 fact 0개. 조각 사이 겹친 카드 없음 |
+| 흔적 | 에이전트가 쓴 파일은 `output/_exp/_ai/*.response.md`뿐. 다른 스크립트·파일 없음. 윈도우 `.venv`는 그대로 |
+| 확인 못 함 | 세션 기록이 가상 머신 디스크 안에 있어 금지 파일 읽기 여부를 로그로 판정하지 못함. 허락 창은 폴더 연결 때만 — `.claude/settings.json` 규칙이 적용됐는지 알 수 없음. 시각 기록이 UTC(가상 머신)로 남음 |
+| 걸린 것 | ① me.example 예시 카드 2개(그중 1개는 `verified: true`)가 진짜 카드와 섞여 남음 — 가짜 경험이 매칭·초안에 쓰일 위험. ② `exp check` 경고 64개 중 31개가 "verified가 true가 아닙니다" 반복. ③ "숫자 1가", "situation가" 같은 조사 오류 |
+| 반영 (v0.2.1) | 예시 카드(id·제목이 me.example과 같음)를 `exp check` 오류로, `accept exp-extract`·report에서도 알림. 확인 전 카드는 한 줄로 묶음. 변수 뒤 조사를 문장 구조나 "은(는)" 꼴로. README에 가상 머신 작업 모드 안내 |
+
 **남았다**
 - 사람인 오픈 API 개인 키 발급 가능 여부와 현재 엔드포인트, 원티드·잡코리아 공식 API 유무 (v2)
 - 사람인·잡코리아·원티드 맞춤공고 알림 메일 실제 샘플 (v2 파서용)

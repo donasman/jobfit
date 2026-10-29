@@ -186,7 +186,7 @@ def _header_map(ws, expected: tuple[str, ...], sheet: str, result: ReadResult) -
         result.errors.append(RowError(sheet, 1, f"필수 헤더가 없습니다: {', '.join(missing_required)}. 헤더 이름을 되돌려 주세요."))
         return None
     for h in missing:
-        result.errors.append(RowError(sheet, 1, f"헤더 '{h}'가 없어 그 열은 비어 있는 것으로 봅니다"))
+        result.errors.append(RowError(sheet, 1, f"헤더가 없어 그 열은 비어 있는 것으로 봅니다: '{h}'"))
     return cols
 
 

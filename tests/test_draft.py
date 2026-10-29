@@ -130,7 +130,7 @@ def test_fabricated_number_goes_to_revise_once(tmp_path, capsys):
     job = _job(project)
     assert job.status == "AI대기" and job.steps["draft"]["phase"] == "revise" and job.steps["draft"]["revise_qids"] == ["q1"]
     revise = (project.ai_dir(KEY) / "revise.prompt.md").read_text(encoding="utf-8")
-    assert "=== q1 ===" in revise and "=== q2 ===" not in revise and "'78%'는 경험 카드 facts에 없는 숫자" in revise
+    assert "=== q1 ===" in revise and "=== q2 ===" not in revise and "'78%'은(는) 경험 카드 facts에 없는 숫자" in revise
     assert cli.main(["--root", str(tmp_path), "prep"]) == 0  # 이제 수정 프롬프트를 준다
     assert "revise.prompt.md" in capsys.readouterr().out
     assert cli.main(["--root", str(tmp_path), "accept", "--file", _answer(tmp_path, f"=== q1 ===\n{GOOD_Q1}", "r.txt")]) == 0
@@ -196,4 +196,4 @@ def test_exp_check_warns_star_numbers_outside_facts(tmp_path, capsys):
     project = Project(tmp_path)
     project.experiences_file.write_text(CARDS.replace("응답 시간이 줄고", "응답 시간이 78% 줄고"), encoding="utf-8")
     cli.main(["--root", str(tmp_path), "exp", "check"])
-    assert "star의 숫자 78%가 facts에 없습니다" in capsys.readouterr().out
+    assert "star에 facts에 없는 숫자가 있습니다: 78%" in capsys.readouterr().out

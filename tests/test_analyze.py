@@ -144,3 +144,15 @@ def test_paste_rejects_prompt_copied_back(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("jobfit.ai.promptfile.read_clipboard", lambda: prompt)
     assert cli.main(["--root", str(tmp_path), "accept", "--paste"]) == 1
     assert "프롬프트가 그대로" in capsys.readouterr().out
+
+
+def test_report_warns_about_copied_example_cards(tmp_path, capsys):
+    shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
+    project = _ready_project(tmp_path)  # init 이 예시 카드를 me/ 로 복사한다
+    answer = tmp_path / "answer.txt"
+    answer.write_text(json.dumps(GOOD, ensure_ascii=False), encoding="utf-8")
+    assert cli.main(["--root", str(tmp_path), "accept", "--file", str(answer)]) == 0
+    cli.main(["--root", str(tmp_path), "run"])
+    report = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "예시 카드 2개가 경험 은행에 남아 있습니다" in report
+    assert "경험 카드 검사에서 오류" not in report  # 같은 내용을 두 번 말하지 않는다

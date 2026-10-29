@@ -13,7 +13,7 @@ from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING
 from jobfit.drafts import load_drafts, load_lint
 from jobfit.emphasis import build_emphasis, load_resume
-from jobfit.experiences import check_cards, load_cards
+from jobfit.experiences import check_cards, example_ids, load_cards
 from jobfit.match import load_analysis, load_match
 from jobfit.paths import Project
 from jobfit.state import Job
@@ -156,10 +156,13 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     used = {c["id"] for q in questions for c in q.get("cards", [])} | {c["id"] for c in match.get("cards", [])[:TOP_FOR_NOTES]}
     for c in match.get("cards", []):
         if c["id"] in used and not c["verified"]:
-            notes.append(f"경험 카드 '{titles[c['id']]}'는 verified가 true가 아닙니다 — 사실을 확인한 뒤 true로 바꾸세요")
+            notes.append(f"경험 카드 '{titles[c['id']]}'은(는) verified가 true가 아닙니다 — 사실을 확인한 뒤 true로 바꾸세요")
     if analysis.get("dropped_questions"):
         notes.append(f"AI가 낸 문항 중 공고 원문에 없는 {len(analysis['dropped_questions'])}개를 버렸습니다: " + " / ".join(_short(x) for x in analysis["dropped_questions"]))
-    errors = [i for i in check_cards(cards, kd) if i.level == "오류"]
+    examples = example_ids(cards, project.me_example_dir / "experiences.yaml")
+    if examples:
+        notes.append(f"me.example 에서 복사된 예시 카드 {len(examples)}개가 경험 은행에 남아 있습니다({', '.join(examples)}) — 가짜 경험이 매칭·초안에 쓰이니 me/experiences.yaml 에서 지우세요")
+    errors = [i for i in check_cards(cards, kd, examples) if i.level == "오류" and i.kind != "example"]
     if errors or card_problems:
         notes.append(f"경험 카드 검사에서 오류 {len(errors) + len(card_problems)}건 — `jobfit exp check`")
     if lints:

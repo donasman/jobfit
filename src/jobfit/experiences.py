@@ -56,9 +56,14 @@ class CardIssue:
     level: str  # "오류" | "경고"
     card: str
     message: str
+    kind: str = ""  # "unverified" 는 화면에서 한 줄로 묶는다
 
     def __str__(self) -> str:
         return f"[{self.level}] {self.card}: {self.message}"
+
+
+UNVERIFIED_NOTE = "이 카드들의 숫자는 초안에서 경고로 표시됩니다. 사실을 확인한 뒤 verified: true 로"
+EXAMPLE_NOTE = "me.example 에서 복사된 예시 카드입니다 — 지우세요. 그대로 두면 가짜 경험과 숫자가 매칭·초안에 쓰입니다"
 
 
 def load_cards(path: Path) -> tuple[list[dict], list[str]]:
@@ -114,15 +119,24 @@ def is_verified(card: dict) -> bool:
     return card.get("verified") is True
 
 
-def check_cards(cards: list[dict], kd: KeywordDict) -> list[CardIssue]:
+def example_ids(cards: list[dict], example_file: Path) -> list[str]:
+    """me.example 에서 그대로 복사된 예시 카드의 id. id와 제목이 둘 다 같아야 예시로 본다(고쳐 쓴 카드는 내 카드)."""
+    examples, _ = load_cards(example_file)
+    pairs = {(str(c.get("id")), str(c.get("title", "")).strip()) for c in examples if c.get("id")}
+    return [str(c.get("id")) for c in cards if (str(c.get("id")), str(c.get("title", "")).strip()) in pairs]
+
+
+def check_cards(cards: list[dict], kd: KeywordDict, examples: list[str] | tuple = ()) -> list[CardIssue]:
     issues: list[CardIssue] = []
     seen: dict[str, int] = {}
     for i, card in enumerate(cards, start=1):
         name = str(card.get("id") or f"{i}번째 카드")
-        add = lambda level, msg: issues.append(CardIssue(level, name, msg))  # noqa: E731
+        add = lambda level, msg, kind="": issues.append(CardIssue(level, name, msg, kind))  # noqa: E731
+        if card.get("id") and str(card.get("id")) in examples:
+            add("오류", EXAMPLE_NOTE, "example")
         for f in _REQUIRED:
             if card.get(f) in (None, "", []):
-                add("오류", f"{f}가 비어 있습니다")
+                add("오류", f"{f} 칸이 비어 있습니다")
         cid = str(card.get("id") or "")
         if cid:
             if cid in seen:
@@ -136,14 +150,14 @@ def check_cards(cards: list[dict], kd: KeywordDict) -> list[CardIssue]:
             s = str(t).strip()
             canon = kd.normalize(s)
             if s and canon != s:
-                add("경고", f"태그 '{s}'는 대표 표기 '{canon}'로 써 주세요")
+                add("경고", f"태그 '{s}' 대신 대표 표기 '{canon}'(으)로 써 주세요")
         usable = card.get("usable_for") or []
         for u in usable if isinstance(usable, list) else [usable]:
             norm = normalize_type(u)
             if norm is None:
-                add("오류", f"usable_for '{u}'는 {' · '.join(QUESTION_TYPES)} 중 하나여야 합니다")
+                add("오류", f"usable_for 의 '{u}'은(는) {' · '.join(QUESTION_TYPES)} 중 하나여야 합니다")
             elif norm != str(u).strip():
-                add("경고", f"usable_for '{u}'는 '{norm}'(으)로 읽습니다")
+                add("경고", f"usable_for 의 '{u}'은(는) '{norm}'(으)로 읽습니다")
         facts = card.get("facts")
         if not facts:
             add("경고", "facts가 없습니다 — 이 카드로 쓴 초안에는 수치를 쓸 수 없습니다")
@@ -155,19 +169,19 @@ def check_cards(cards: list[dict], kd: KeywordDict) -> list[CardIssue]:
         else:
             empty = [k for k in _STAR_KEYS if not str(star.get(k) or "").strip()]
             if empty:
-                add("경고", f"star의 {', '.join(empty)}가 비어 있습니다")
+                add("경고", f"star에서 비어 있는 칸: {', '.join(empty)}")
             # star 에만 있는 숫자는 초안에 쓰이면 검사에 걸린다 — facts 로 옮기거나 지우게 알린다
             fact_nums = [n for f in (facts if isinstance(facts, list) else []) for n in extract(str(f)).numbers]
             loose = [n.raw for k in _STAR_KEYS for n in extract(str(star.get(k) or "")).numbers if not same_value(n, fact_nums)]
             if loose:
-                add("경고", f"star의 숫자 {', '.join(dict.fromkeys(loose))}가 facts에 없습니다 — 초안에 쓰면 검사에 걸립니다")
+                add("경고", f"star에 facts에 없는 숫자가 있습니다: {', '.join(dict.fromkeys(loose))} — 초안에 쓰면 검사에 걸립니다")
         if "verified" not in card:
-            add("경고", "verified가 없어 '확인 필요'로 표시됩니다")
+            add("경고", "verified가 없어 '확인 필요'로 표시됩니다", "unverified")
         elif card.get("verified") is not True:
-            add("경고", "verified가 true가 아닙니다 — 이 카드의 숫자는 초안에서 경고로 표시됩니다. 사실을 확인한 뒤 true로")
+            add("경고", "verified가 true가 아닙니다 — 이 카드의 숫자는 초안에서 경고로 표시됩니다. 사실을 확인한 뒤 true로", "unverified")
         period = str(card.get("period") or "").strip()
         if period and not _PERIOD.match(period):
-            add("경고", f"period '{period}'를 읽을 수 없습니다 (예: 2025-03 ~ 2025-06)")
+            add("경고", f"period 값 '{period}'을(를) 읽을 수 없습니다 (예: 2025-03 ~ 2025-06)")
     return issues
 
 

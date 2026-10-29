@@ -25,7 +25,7 @@
 
 ## 사용자에게
 10. 초안 단계 뒤에는 `accept draft` 결과(글자수·경고·확인 필요 항목)를 요약해 보여 준다. 공고 하나가 끝나면(문항대기 포함) `output/<공고>/report.md`를 읽어 매칭 점수와 이력서 강조 포인트를 짧게 알려 준다. 경험 카드 문제는 `uv run jobfit exp check` 출력만 전한다(카드 파일은 읽지 않는다).
-   - 경험 카드를 뽑은 뒤에는 `accept exp-extract`가 출력한 추가 카드 목록과 빠진 fact 경고를 그대로 보여 주고, "사실을 확인한 뒤 me/experiences.yaml 에서 verified: true 로 바꾸세요"라고 알린다. verified 는 사람만 바꾼다.
+   - 경험 카드를 뽑은 뒤에는 `accept exp-extract`가 출력한 추가 카드 목록과 빠진 fact 경고를 그대로 보여 주고, "사실을 확인한 뒤 me/experiences.yaml 에서 verified: true 로 바꾸세요"라고 알린다. verified 는 사람만 바꾼다. "예시 카드가 아직 있습니다"가 나오면 그대로 전하고 사용자에게 지워 달라고 한다(`me/`는 사람이 고친다).
 11. Notion에는 **사용자가 올려 달라고 할 때만** 반영한다. Notion 커넥터가 있으면 `report.md` 내용으로 페이지를 만들고, 없으면 `uv run jobfit export notion` 결과 위치를 알려 준다.
 12. `jobs.xlsx`는 직접 읽거나 고치지 않는다. 사용자 입력은 `uv run jobfit sync-in`이 읽는다. 공고 추가는 `uv run jobfit add "<링크>" [--company 회사명] [--title 직무] [--deadline YYYY-MM-DD]`만.
    - "회사명을 읽지 못했습니다" → 사용자에게 회사명을 묻고 `--company`를 붙여 다시.

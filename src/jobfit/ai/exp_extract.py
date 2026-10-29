@@ -25,7 +25,7 @@ import yaml
 from jobfit.ai.promptfile import LIMITS, load_template, log_usage, render
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import mask_contacts
-from jobfit.experiences import FILE_HEADER, card_tags, load_cards, normalize_type
+from jobfit.experiences import EXAMPLE_NOTE, FILE_HEADER, card_tags, example_ids, load_cards, normalize_type
 from jobfit.match import ROLE_WORDS
 from jobfit.numbers import extract, same_value
 from jobfit.paths import Project
@@ -273,6 +273,9 @@ def accept(project: Project, raw: str | None = None, prefer: str | None = None) 
         info["status"] = "done"
     info["at"] = now()
     _save_state(project, state)
+    examples = example_ids(existing, project.me_example_dir / "experiences.yaml")
+    if examples:
+        warnings.append(f"예시 카드 {len(examples)}개가 아직 있습니다({', '.join(examples)}) — {EXAMPLE_NOTE.split(' — ', 1)[1]}. me/experiences.yaml 에서 직접 지우세요")
     return Accepted(ok=True, added=cards, warnings=warnings, item=item, remaining=len(pending_items(project)))
 
 
@@ -326,7 +329,7 @@ def normalize_cards(data: list, existing: list[dict], kd: KeywordDict, source_te
         for u in _str_list(raw.get("usable_for")):
             (usable if normalize_type(u) else bad).append(normalize_type(u) or u)
         if bad:
-            warnings.append(f"{cid}: 문항 유형이 아닌 '{', '.join(bad)}'는 뺐습니다")
+            warnings.append(f"{cid}: 문항 유형이 아니라서 뺐습니다 — {', '.join(bad)}")
         star_raw = raw.get("star") if isinstance(raw.get("star"), dict) else {}
         star = {k: str(star_raw.get(k) or "").strip() for k in ("situation", "task", "action", "result")}
         star_nums = extract(" ".join(star.values())).numbers
