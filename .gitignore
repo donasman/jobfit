@@ -1,3 +1,7 @@
+# 에이전트 도구의 개인 설정·상태 — 배포·공유 대상이 아니다
+.claude/settings.local.json
+.omc/
+
 # Python-generated files
 __pycache__/
 *.py[oc]
