@@ -94,6 +94,30 @@ def test_column_order_change_is_fine(tmp_path):
     assert result.jobs[0].company == "원티드사" and result.jobs[0].url.endswith("/wd/7")
 
 
+def test_apply_via_column(tmp_path):
+    path = _make(
+        tmp_path,
+        [
+            ["자동", "", "", None, "", None, None, None],
+            ["홈페이지사", "", "", None, "", None, None, "홈페이지"],
+            ["오타", "", "", None, "", None, None, "회사사이트"],
+        ],
+    )
+    result = read_jobs_workbook(path)
+    assert [(j.company, j.apply_via) for j in result.jobs] == [("자동", ""), ("홈페이지사", "홈페이지")]
+    assert len(result.errors) == 1 and "지원방법은 플랫폼/홈페이지/이메일" in result.errors[0].message
+
+
+def test_old_workbook_without_apply_via_column_is_fine(tmp_path):
+    path = _make(tmp_path, [["예전회사", "", "", None, "", None, None]])
+    wb = load_workbook(path)
+    wb[SHEET_JOBS].delete_cols(JOB_HEADERS.index("지원방법") + 1)
+    wb.save(path)
+    result = read_jobs_workbook(path)
+    assert result.ok, [str(e) for e in result.errors]  # 나중에 더한 열은 없어도 알리지 않는다
+    assert result.jobs[0].apply_via == ""
+
+
 def test_missing_required_header_stops_sheet(tmp_path):
     path = _make(tmp_path, [])
     wb = load_workbook(path)

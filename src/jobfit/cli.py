@@ -12,7 +12,7 @@ from jobfit import __version__
 from jobfit import jobkey, menunum, pipeline
 from jobfit.excel.workbook import create_jobs_workbook
 from jobfit.paths import Project
-from jobfit.state import STATUS_AI, STATUS_REVIEW, STATUS_RUNNING, State
+from jobfit.state import APPLY_VIAS, STATUS_AI, STATUS_REVIEW, STATUS_RUNNING, State
 
 UNIMPLEMENTED: dict[str, str] = {}
 # 단계별 실행 명령이 먼저 끝나 있어야 하는 단계
@@ -76,6 +76,7 @@ def cmd_add(project: Project, args) -> int:
 
     url = (args.url or "").strip()
     company, title, memo = (args.company or "").strip(), (args.title or "").strip(), (args.memo or "").strip()
+    apply_via = args.apply_via or ""
     if url and not re.match(r"^https?://", url, re.I):
         print(f"링크는 http(s)://로 시작해야 합니다: {url}")
         return 2
@@ -128,7 +129,7 @@ def cmd_add(project: Project, args) -> int:
                 return 0
 
     try:
-        row = append_job_row(project.jobs_xlsx, project.backups_dir, company, title, url, deadline, memo)
+        row = append_job_row(project.jobs_xlsx, project.backups_dir, company, title, url, deadline, memo, apply_via)
     except ExcelBusy as e:
         print(str(e))
         return 1
@@ -136,6 +137,8 @@ def cmd_add(project: Project, args) -> int:
     print(f"추가: 공고 시트 {row}행 — {shown}" + (f"  ({jobkey.derive(url).key})" if url else ""))
     if filled:
         print("  페이지에서 읽은 값: " + ", ".join(filled) + " — 틀리면 jobs.xlsx에서 고치세요")
+    if apply_via and "지원방법" not in existing.job_headers:
+        print("  jobs.xlsx 공고 시트에 '지원방법' 열이 없어 지원방법은 넣지 않았습니다 — 1행 빈 칸에 '지원방법'이라고 적으면 그 열을 씁니다")
     print("다음: jobfit run")
     return 0
 
@@ -995,6 +998,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add.add_argument("--title", help="직무")
     add.add_argument("--deadline", help="마감일 (2026-11-30)")
     add.add_argument("--memo", help="메모")
+    add.add_argument("--apply-via", choices=APPLY_VIAS, help="지원방법 (비우면 공고 페이지에서 읽음)")
     add.set_defaults(func=cmd_add)
     sub.add_parser("check", help="jobs.xlsx 검사만").set_defaults(func=cmd_check)
     sub.add_parser("sync-in", help="jobs.xlsx 읽어 상태에 반영").set_defaults(func=cmd_sync_in)

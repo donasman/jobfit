@@ -19,6 +19,7 @@ from pathlib import Path
 from jobfit.clean.html2text import html_to_text
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.sections import Section, clean_title, drop_noise, find_questions, has_posting_body, split_sections, summary_fields
+from jobfit.fetch.channel import page_htmls, read_channel
 from jobfit.fetch.fetcher import FILE_DETAIL, FILE_MAIN, FILE_META
 
 FILE_POSTING = "posting.txt"
@@ -45,11 +46,12 @@ class CleanResult:
     full_chars: int = 0
     truncated: bool = False
     posting_sha1: str = ""  # 스크립트가 쓴 posting.txt의 해시. 다르면 사용자가 고친 것
+    apply: dict = field(default_factory=dict)  # 페이지에서 읽은 지원처(fetch/channel.py의 ApplyChannel)
     error: str = ""
     next_hint: str = ""
 
 
-def clean_job(job_dir: Path, data_dir: Path) -> CleanResult:
+def clean_job(job_dir: Path, data_dir: Path, url: str = "") -> CleanResult:
     fetch_meta = _load_json(job_dir / FILE_META)
     if is_user_posting(job_dir):
         result = _clean_pasted(job_dir, data_dir)
@@ -57,6 +59,9 @@ def clean_job(job_dir: Path, data_dir: Path) -> CleanResult:
         result = _clean_fetched(job_dir, fetch_meta, data_dir)
     else:
         return CleanResult(ok=False, source="none", error="공고 본문이 없습니다", next_hint="공고 본문 붙여넣기 (output 폴더의 posting.txt)")
+    if result.ok:
+        full = (job_dir / FILE_FULL).read_text(encoding="utf-8", errors="replace")
+        result.apply = asdict(read_channel(url or fetch_meta.get("url", ""), page_htmls(job_dir), full))
 
     (job_dir / FILE_CLEAN_META).write_text(json.dumps(asdict(result), ensure_ascii=False, indent=2), encoding="utf-8")
     return result

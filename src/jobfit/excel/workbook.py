@@ -13,16 +13,18 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from jobfit.state import DECISIONS, TASKS
+from jobfit.state import APPLY_VIAS, DECISIONS, TASKS
 
 SHEET_JOBS = "공고"
 SHEET_QUESTIONS = "문항"
 SHEET_GUIDE = "안내"
 
 # 공고 시트. 마지막 "공고표시"는 문항 시트 드롭다운용 수식 열(숨김) — 스크립트 상태가 아니라 수식이다
-JOB_HEADERS = ("회사명", "직무", "링크", "마감일", "메모", "결정", "작업")
+JOB_HEADERS = ("회사명", "직무", "링크", "마감일", "메모", "결정", "작업", "지원방법")
 JOB_DISPLAY_HEADER = "공고표시"
 JOB_REQUIRED = ("회사명",)
+# 나중에 더한 열. 예전 jobs.xlsx에 없어도 알리지 않고 빈칸(자동)으로 본다
+JOB_LATER_HEADERS = ("지원방법",)
 
 QUESTION_HEADERS = ("공고", "번호", "문항", "글자수", "공백포함")
 QUESTION_REQUIRED = ("공고", "문항")
@@ -49,6 +51,8 @@ GUIDE_LINES = (
     "         보류·지원안함은 처리하지 않습니다(미정으로 되돌리면 다시 처리). 지원완료 이후 값은 끝난 공고로 봅니다.",
     "  작업 — 빈칸 / 재실행 / 초안만 재작성. 값이 바뀐 시점에 한 번만 실행됩니다.",
     "         실행이 끝나면 dashboard에 '작업 칸을 비워 주세요'가 뜹니다. 같은 작업을 다시 하려면 비웠다가 다시 고르세요.",
+    "  지원방법 — 빈칸(자동) / 플랫폼 / 홈페이지 / 이메일. 비워 두면 공고 페이지에서 읽습니다.",
+    "         사람인·잡코리아 공고도 실제 지원은 회사 홈페이지나 이메일로 받는 경우가 있습니다. 페이지에서 못 읽었거나 틀렸으면 적으세요.",
     "  공고표시(숨김, 회색) — 문항 시트 드롭다운용 수식입니다. 지우면 드롭다운만 사라지고 직접 입력은 됩니다.",
     "",
     "■ 문항 시트",
@@ -119,6 +123,8 @@ def ensure_validations(wb) -> int:
             added += _ensure(ws, _list_dv(DECISIONS, "결정"), jobs_cols["결정"])
         if "작업" in jobs_cols:
             added += _ensure(ws, _list_dv([t for t in TASKS if t], "작업"), jobs_cols["작업"])
+        if "지원방법" in jobs_cols:
+            added += _ensure(ws, _list_dv(APPLY_VIAS, "지원방법"), jobs_cols["지원방법"])
         if "마감일" in jobs_cols:
             dv = DataValidation(type="date", operator="greaterThan", formula1="DATE(2000,1,1)", allow_blank=True)
             dv.errorStyle = "warning"
@@ -166,7 +172,7 @@ def _ensure(ws, dv: DataValidation, letter: str) -> int:
 def _build_jobs_sheet(ws) -> None:
     headers = (*JOB_HEADERS, JOB_DISPLAY_HEADER)
     ws.append(headers)
-    widths = {"회사명": 18, "직무": 28, "링크": 48, "마감일": 12, "메모": 30, "결정": 10, "작업": 14, JOB_DISPLAY_HEADER: 30}
+    widths = {"회사명": 18, "직무": 28, "링크": 48, "마감일": 12, "메모": 30, "결정": 10, "작업": 14, "지원방법": 10, JOB_DISPLAY_HEADER: 30}
     for col, name in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=col)
         cell.font = _HEADER_FONT

@@ -77,7 +77,7 @@ def sync_in(project: Project, state: State) -> SyncReport:
             continue
         job = state.get(k.key)
         if job is None:
-            job = Job(key=k.key, site=k.site, company=row.company, title=row.title, url=row.url, deadline=row.deadline, memo=row.memo, decision=row.decision, task_seen=row.task, row=row.row)
+            job = Job(key=k.key, site=k.site, company=row.company, title=row.title, url=row.url, deadline=row.deadline, memo=row.memo, decision=row.decision, apply_via=row.apply_via, task_seen=row.task, row=row.row)
             state.jobs[k.key] = job
             report.added.append(job)
         else:
@@ -117,7 +117,7 @@ def sync_in(project: Project, state: State) -> SyncReport:
 
 def _apply_row(job: Job, row: JobRow) -> bool:
     changed = False
-    for attr, value in (("company", row.company), ("title", row.title), ("url", row.url), ("deadline", row.deadline), ("memo", row.memo), ("decision", row.decision)):
+    for attr, value in (("company", row.company), ("title", row.title), ("url", row.url), ("deadline", row.deadline), ("memo", row.memo), ("decision", row.decision), ("apply_via", row.apply_via)):
         if getattr(job, attr) != value:
             setattr(job, attr, value)
             changed = True
@@ -207,8 +207,12 @@ def _stale_reason(project: Project, job: Job) -> str:
         if changed:
             names = {"analysis_sha": "공고 분석", "cards_sha": "경험 카드", "questions_sha": "문항", "rules_sha": "매칭 규칙"}
             return "·".join(names[k] for k in changed) + "이(가) 바뀌어 매칭부터 다시"
-    if job.step_done("report") and job.steps["report"].get("resume_sha") != file_sha(project.resume_file):
-        return "이력서 항목이 바뀌어 report부터 다시"
+    if job.step_done("report"):
+        stored = job.steps["report"]
+        if stored.get("resume_sha") != file_sha(project.resume_file):
+            return "이력서 항목이 바뀌어 report부터 다시"
+        if stored.get("apply_via", "") != job.apply_via:
+            return "지원방법이 바뀌어 report부터 다시"
     return ""
 
 
@@ -275,7 +279,7 @@ def _step_fetch(project: Project, job: Job, job_dir: Path) -> tuple[bool, str]:
 
 
 def _step_clean(project: Project, job: Job, job_dir: Path) -> tuple[bool, str]:
-    result = clean_job(job_dir, project.data_dir)
+    result = clean_job(job_dir, project.data_dir, job.url)
     if not result.ok:
         job.set_error(result.error, result.next_hint or PASTE_HINT)
         return False, result.error
@@ -297,7 +301,7 @@ def _step_report(project: Project, job: Job, job_dir: Path) -> tuple[bool, str]:
     if not job.step_done("match"):
         return False, "매칭이 아직입니다"
     write_report(project, job)
-    job.mark("report", done=True, resume_sha=file_sha(project.resume_file))
+    job.mark("report", done=True, resume_sha=file_sha(project.resume_file), apply_via=job.apply_via)
     return True, ""
 
 

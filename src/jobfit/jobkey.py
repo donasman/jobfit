@@ -7,6 +7,9 @@
   <사이트>:<공고번호>   사람인·잡코리아·원티드·점핏·리멤버·프로그래머스·토스
   url:<호스트/경로?남은 값>  모르는 사이트. 추적값과 #뒤를 뺀 정규화 URL
   local:<해시8>         링크가 없을 때. 회사명|직무|마감일 해시
+
+게시처(kind) — 공고를 받은 곳이 채용 플랫폼(board)인가 회사 채용 사이트(company)인가.
+어디로 지원하는가(지원처)와는 다르다(fetch/channel.py).
 """
 
 from __future__ import annotations
@@ -27,6 +30,16 @@ _SITE_RULES: list[tuple[str, str, list[str]]] = [
     ("programmers", r"programmers\.co\.kr$", [r"/job_positions/(\d+)"]),
 ]
 
+# 게시처가 채용 플랫폼인 사이트. 토스·모르는 사이트는 회사 채용 사이트로 본다
+BOARD_SITES = {"saramin", "jobkorea", "wanted", "jumpit", "remember", "programmers"}
+# 공고번호 규칙이 없어 키는 url: 그대로인 채용 플랫폼 — 게시처 판정에만 쓴다.
+# 여기 넣은 사이트에 번호 규칙을 새로 만들면 이미 등록된 공고의 키가 바뀌어 state에서 빠진다
+_BOARD_HOSTS = re.compile(r"(^|\.)(incruit\.com|catch\.co\.kr|linkareer\.com|jasoseol\.com|job\.alio\.go\.kr|work24\.go\.kr|work\.go\.kr)$")
+
+KIND_BOARD = "board"
+KIND_COMPANY = "company"
+KIND_LOCAL = "local"
+
 # 사이트 호스트에서 떼는 접두어
 _HOST_PREFIX = re.compile(r"^(www|m)\.")
 
@@ -44,6 +57,17 @@ class JobKey:
     @property
     def has_url(self) -> bool:
         return self.site != "local"
+
+    @property
+    def kind(self) -> str:
+        """게시처: board(채용 플랫폼) · company(회사 채용 사이트, 모르는 사이트 포함) · local(링크 없음)."""
+        if self.site == "local":
+            return KIND_LOCAL
+        if self.site in BOARD_SITES:
+            return KIND_BOARD
+        if self.site == "url" and _BOARD_HOSTS.search(self.key[len("url:"):].split("/", 1)[0]):
+            return KIND_BOARD
+        return KIND_COMPANY
 
 
 def site_of(url: str) -> str:

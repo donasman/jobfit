@@ -6,7 +6,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from jobfit import cli
-from jobfit.excel.workbook import SHEET_QUESTIONS
+from jobfit.excel.workbook import SHEET_QUESTIONS, header_letters
 from jobfit.notices import HEADER
 from jobfit.paths import Project
 from jobfit.report import build_report
@@ -105,6 +105,25 @@ def test_report_sections(tmp_path):
     assert "앞세울 경험 (내 이력서 항목이 없어 경험 카드 순위로)" in text
     assert "공고에 자소서 문항이 없습니다" in text
     assert "verified가 true가 아닙니다" in text
+    assert "> 지원 방법 **홈페이지** · 근거: 공고 글 '접수방법 : 자유양식의 이력서를 홈페이지 접수'" in text
+
+
+def test_user_apply_via_overrides_page_and_rebuilds_report(tmp_path, capsys):
+    project = _project(tmp_path)
+    wb = load_workbook(project.jobs_xlsx)
+    ws = wb["공고"]
+    ws[f"{header_letters(ws)['지원방법']}2"] = "이메일"
+    wb.save(project.jobs_xlsx)
+    capsys.readouterr()
+    assert cli.main(["--root", str(tmp_path), "run"]) == 0
+    assert "지원방법이 바뀌어 report부터 다시" in capsys.readouterr().out
+    text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "> 지원 방법 **이메일** · 근거: jobs.xlsx 지원방법 칸" in text
+    ws = load_workbook(project.dashboard_xlsx)["검토"]
+    assert ws.cell(row=2, column=[c.value for c in ws[1]].index("지원방법") + 1).value == "이메일"
+    capsys.readouterr()
+    assert cli.main(["--root", str(tmp_path), "run"]) == 0
+    assert "지원방법이 바뀌어" not in capsys.readouterr().out  # 한 번만
 
 
 def test_report_with_resume_items_and_wording(tmp_path):
@@ -221,6 +240,7 @@ def test_dashboard_contents(tmp_path):
     assert isinstance(row["매칭점수"].value, int)
     assert row["문항"].value == "미입력" and row["초안"].value == "문항 없음"
     assert row["처리상태"].value == "문항대기"
+    assert row["지원방법"].value == "홈페이지"
     assert row["결과"].hyperlink.target == "output/saramin-10000001/report.md"
     assert row["공고키"].value == KEY
     assert "입력 문제" not in wb.sheetnames

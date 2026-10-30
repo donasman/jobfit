@@ -10,6 +10,7 @@ import pytest
 
 from jobfit.clean.html2text import html_to_text
 from jobfit.clean.sections import drop_noise, find_questions, has_posting_body, split_sections, summary_fields
+from jobfit.fetch.channel import read_channel
 from jobfit.fetch.meta import read_posting_meta
 
 LIVE = Path(__file__).parent / "fixtures_live"
@@ -37,6 +38,22 @@ def test_live_page_still_parses(main: Path):
 def test_live_saramin_summary(main: Path):
     fields = summary_fields(_text(main))
     assert {"경력", "마감일"} <= set(fields), fields
+
+
+# 공고를 본 곳과 지원하는 곳이 다른 실측 공고(2026-10) — 받아 둔 페이지가 있을 때만
+LIVE_CHANNELS = {
+    "saramin-55145352": ("https://www.saramin.co.kr/zf_user/jobs/view?rec_idx=55145352", "홈페이지", "https://interxlab.career.greetinghr.com/ko/o/138437"),
+    "jobkorea-50182629": ("https://www.jobkorea.co.kr/Recruit/GI_Read/50182629", "이메일", ""),
+}
+
+
+@pytest.mark.parametrize("main", [p for p in PAIRS if p.stem in LIVE_CHANNELS], ids=lambda p: p.stem)
+def test_live_apply_channel(main: Path):
+    url, via, link = LIVE_CHANNELS[main.stem]
+    pages = [p for p in (main, main.with_name(main.stem + "-detail.html")) if p.exists()]
+    htmls = [p.read_text(encoding="utf-8", errors="replace") for p in pages]
+    ch = read_channel(url, htmls, "\n\n".join(_text(p) for p in pages))
+    assert (ch.via, ch.url) == (via, link), ch
 
 
 @pytest.mark.parametrize("main", [p for p in PAIRS if p.stem.startswith("jobkorea")], ids=lambda p: p.stem)

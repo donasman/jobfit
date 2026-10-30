@@ -268,7 +268,7 @@ def finalize(project: Project, job: Job, answers: dict[str, str], digest: str, r
     if STEP in job.force_steps:
         job.force_steps.remove(STEP)
     write_report(project, job)
-    job.mark("report", done=True, resume_sha=file_sha(project.resume_file))
+    job.mark("report", done=True, resume_sha=file_sha(project.resume_file), apply_via=job.apply_via)
     return DraftAccepted(ok=True, lints=lints, done=True)
 
 

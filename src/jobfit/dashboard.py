@@ -20,13 +20,13 @@ from jobfit.drafts import lint_summary, load_lint
 from jobfit.excel.append import lock_files
 from jobfit.match import load_analysis, load_match
 from jobfit.paths import Project
-from jobfit.report import FILE_REPORT
+from jobfit.report import FILE_REPORT, apply_channel
 from jobfit.state import DECISIONS_CLOSED, DECISIONS_PAUSED, STATUS_AI, STATUS_NEED_QUESTIONS, STATUS_REVIEW, Job, State
 
 SHEET_REVIEW = "검토"
 SHEET_INPUT = "입력 문제"
-HEADERS = ("회사명", "직무", "결정", "D-day", "처리상태", "매칭점수", "문항", "초안", "다음 할 일", "오류", "결과", "공고키")
-WIDTHS = (16, 26, 9, 8, 10, 9, 16, 12, 40, 30, 14, 24)
+HEADERS = ("회사명", "직무", "결정", "D-day", "처리상태", "지원방법", "매칭점수", "문항", "초안", "다음 할 일", "오류", "결과", "공고키")
+WIDTHS = (16, 26, 9, 8, 10, 9, 9, 16, 12, 40, 30, 14, 24)
 
 _HEADER_FILL = PatternFill("solid", fgColor="DDEBF7")
 _SOON_FILL = PatternFill("solid", fgColor="FFF2CC")
@@ -111,12 +111,14 @@ def _row(project: Project, job: Job) -> list:
     else:
         draft = "문항 없음" if job.step_done("report") and n == 0 else ""
     score = match.get("score") if match else None
+    via = apply_channel(project, job).via or ("모름" if job.step_done("clean") else "")
     return [
         job.company,
         job.title,
         job.decision,
         "",
         job.status,
+        via,
         score if score is not None else "",
         q_text,
         draft,

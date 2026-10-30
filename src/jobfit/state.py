@@ -31,6 +31,12 @@ DECISIONS_CLOSED = {"지원완료", "서류합격", "탈락", "최종합격"}  #
 
 TASKS = ("", "재실행", "초안만 재작성")
 
+# 지원처 — 어디로 지원하나. jobs.xlsx 지원방법 칸(빈칸이면 페이지에서 읽은 값)과 fetch/channel.py가 같이 쓴다
+VIA_BOARD = "플랫폼"  # 사람인 입사지원·잡코리아 즉시지원처럼 플랫폼에 올린 이력서로
+VIA_COMPANY = "홈페이지"  # 회사 채용 사이트 양식에 새로 입력
+VIA_EMAIL = "이메일"
+APPLY_VIAS = (VIA_BOARD, VIA_COMPANY, VIA_EMAIL)
+
 # 파이프라인 단계 순서. 구현되지 않은 단계는 pipeline.IMPLEMENTED에 없다.
 # report는 매칭 뒤에 한 번 나오고(문항이 없어도), 초안 단계가 끝나면 다시 만든다
 STEPS = ("fetch", "clean", "analyze", "match", "report", "draft")
@@ -50,6 +56,7 @@ class Job:
     deadline: str = ""  # YYYY-MM-DD 또는 빈칸
     memo: str = ""
     decision: str = DECISION_DEFAULT
+    apply_via: str = ""  # jobs.xlsx 지원방법 칸(사용자 지정). 빈칸이면 페이지에서 읽은 값을 쓴다
     task_seen: str = ""  # 마지막으로 본 작업 열 값. 값이 바뀔 때만 한 번 실행한다
     status: str = STATUS_WAITING
     steps: dict[str, dict[str, Any]] = field(default_factory=dict)  # 단계 -> {done, at, note}

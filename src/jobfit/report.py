@@ -6,14 +6,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
 from jobfit.clean.keywords import KeywordDict
-from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING
+from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING, mask_contacts
 from jobfit.drafts import load_drafts, load_lint
 from jobfit.emphasis import build_emphasis, example_note, load_resume, split_examples
 from jobfit.experiences import check_cards, example_ids, load_cards
+from jobfit.fetch.channel import ApplyChannel, page_htmls, read_channel, resolve
 from jobfit.match import cards_in_use, load_analysis, load_match
 from jobfit.paths import Project
 from jobfit.state import Job
@@ -51,6 +53,9 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     out.append("> " + " · ".join(head))
     if meta.get("summary"):
         out.append("> " + " · ".join(f"{k} {v}" for k, v in meta["summary"].items()))
+    channel = apply_channel(project, job)
+    if channel.via or job.step_done("clean"):
+        out.append("> " + _channel_line(channel, job.url))
 
     # 공고 요약
     out.append("\n## 공고 요약")
@@ -186,6 +191,27 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
         out.extend(f"- {n}" for n in notes)
 
     return "\n".join(out).rstrip() + "\n"
+
+
+def apply_channel(project: Project, job: Job) -> ApplyChannel:
+    """지원처 — jobs.xlsx 지원방법 칸 > 정제 때 페이지에서 읽은 값(meta.json). 그 값이 없는 예전 공고는 지금 읽는다."""
+    job_dir = project.job_dir(job.key)
+    found = _load_json(job_dir / FILE_CLEAN_META).get("apply")
+    if found is None and job.step_done("clean"):
+        found = asdict(read_channel(job.url, page_htmls(job_dir), _read(job_dir / FILE_FULL)))
+    return resolve(job.apply_via, found or {})
+
+
+def _channel_line(channel: ApplyChannel, posting_url: str) -> str:
+    # 근거는 공고 글에서 온 줄이라 담당자 연락처가 섞일 수 있다
+    evidence = mask_contacts(channel.evidence)
+    if not channel.via:
+        why = f" ({evidence})" if evidence else ""
+        return f"지원 방법: 페이지에서 읽지 못했습니다{why} — 알면 jobs.xlsx 지원방법 칸에 적으세요"
+    line = f"지원 방법 **{channel.via}**"
+    if channel.url and channel.url != posting_url:
+        line += f" — [지원 페이지]({channel.url})"
+    return line + (f" · 근거: {evidence}" if evidence else "")
 
 
 def _dday(days: int) -> str:

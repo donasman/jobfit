@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 
 from jobfit.excel.workbook import (
     JOB_HEADERS,
+    JOB_LATER_HEADERS,
     JOB_REQUIRED,
     QUESTION_HEADERS,
     QUESTION_REQUIRED,
@@ -23,7 +24,7 @@ from jobfit.excel.workbook import (
     SPACE_OPTIONS,
 )
 from jobfit.dates import parse_deadline
-from jobfit.state import DECISION_DEFAULT, DECISIONS, TASKS
+from jobfit.state import APPLY_VIAS, DECISION_DEFAULT, DECISIONS, TASKS
 
 _WS = re.compile(r"[\s　 ]+")  # 공백·전각 공백·nbsp
 
@@ -49,6 +50,7 @@ class JobRow:
     memo: str = ""
     decision: str = DECISION_DEFAULT
     task: str = ""
+    apply_via: str = ""  # 빈칸이면 자동(페이지에서 읽음)
 
     @property
     def display(self) -> str:
@@ -70,6 +72,7 @@ class ReadResult:
     jobs: list[JobRow] = field(default_factory=list)
     questions: list[QuestionRow] = field(default_factory=list)
     errors: list[RowError] = field(default_factory=list)
+    job_headers: set[str] = field(default_factory=set)  # 공고 시트 1행에 있는 헤더 — `add`가 없는 열에 쓰려 할 때 알린다
 
     @property
     def ok(self) -> bool:
@@ -96,6 +99,7 @@ def _read_jobs_sheet(ws, result: ReadResult) -> None:
     cols = _header_map(ws, JOB_HEADERS, SHEET_JOBS, result)
     if cols is None:
         return
+    result.job_headers = set(cols)
     for row in ws.iter_rows(min_row=2):
         r = row[0].row
         get = lambda name: _cell(row, cols.get(name))  # noqa: E731
@@ -123,8 +127,12 @@ def _read_jobs_sheet(ws, result: ReadResult) -> None:
         if task not in TASKS:
             result.errors.append(RowError(SHEET_JOBS, r, f"작업 값이 목록에 없습니다: {task}"))
             continue
+        apply_via = _clean(get("지원방법"))
+        if apply_via and apply_via not in APPLY_VIAS:
+            result.errors.append(RowError(SHEET_JOBS, r, f"지원방법은 {'/'.join(APPLY_VIAS)} 중 하나이거나 빈칸(자동)입니다: {apply_via}"))
+            continue
         result.jobs.append(
-            JobRow(row=r, company=company, title=title, url=url, deadline=deadline, deadline_note=note, memo=memo, decision=decision, task=task)
+            JobRow(row=r, company=company, title=title, url=url, deadline=deadline, deadline_note=note, memo=memo, decision=decision, task=task, apply_via=apply_via)
         )
 
 
@@ -186,6 +194,8 @@ def _header_map(ws, expected: tuple[str, ...], sheet: str, result: ReadResult) -
         result.errors.append(RowError(sheet, 1, f"필수 헤더가 없습니다: {', '.join(missing_required)}. 헤더 이름을 되돌려 주세요."))
         return None
     for h in missing:
+        if h in JOB_LATER_HEADERS:
+            continue  # 나중에 더한 열 — 예전 jobs.xlsx에는 없는 게 정상이라 알리지 않는다
         result.errors.append(RowError(sheet, 1, f"헤더가 없어 그 열은 비어 있는 것으로 봅니다: '{h}'"))
     return cols
 

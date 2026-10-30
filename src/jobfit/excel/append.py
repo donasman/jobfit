@@ -39,7 +39,7 @@ def lock_files(path: Path) -> list[Path]:
     return [path.with_name("~$" + path.name), path.with_name(f".~lock.{path.name}#")]
 
 
-def append_job_row(path: Path, backup_dir: Path, company: str, title: str = "", url: str = "", deadline: str = "", memo: str = "") -> int:
+def append_job_row(path: Path, backup_dir: Path, company: str, title: str = "", url: str = "", deadline: str = "", memo: str = "", apply_via: str = "") -> int:
     """추가한 행 번호를 돌려준다."""
     wb = _open_for_write(path, backup_dir)
     ws = wb[SHEET_JOBS]
@@ -53,6 +53,7 @@ def append_job_row(path: Path, backup_dir: Path, company: str, title: str = "", 
         "링크": url,
         "마감일": date.fromisoformat(deadline) if deadline else "",
         "메모": memo,
+        "지원방법": apply_via,  # 열이 없는 예전 jobs.xlsx면 쓰지 않는다(cmd_add가 알린다)
     }
     for name, value in values.items():
         if name in cols and value not in ("", None):
