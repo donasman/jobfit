@@ -1,4 +1,4 @@
-"""여러 형식의 파일에서 글자 꺼내기 — 경험 카드 자료(sources/)와 자소서 샘플(me/samples/)이 같이 쓴다. AI 없음.
+"""여러 형식의 파일에서 글자 꺼내기 — 경험 카드 자료(sources/)와 원안 자소서(sources/자소서/, 예전 me/samples/)가 같이 쓴다. AI 없음.
 
 읽는 형식: txt · md · csv · docx · hwpx · pptx · html · xlsx · pdf(글자가 들어 있는 것)
 못 읽는 것: 이미지, 스캔한 PDF(글자 층이 거의 없음), hwp(옛 한글 형식), 그 밖 — `read_any`가 None을 돌려준다.

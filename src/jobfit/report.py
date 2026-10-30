@@ -19,6 +19,7 @@ from jobfit.fetch.channel import ApplyChannel, page_htmls, read_channel, resolve
 from jobfit.match import cards_in_use, load_analysis, load_match
 from jobfit.paths import Project
 from jobfit.state import Job
+from jobfit.style import draft_blocker, is_draft_rules
 
 FILE_REPORT = "report.md"
 
@@ -139,7 +140,11 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
         for q in questions:
             limit = f" ({q['limit']}자, 공백 {'포함' if q.get('count_spaces', True) else '제외'})" if q.get("limit") else ""
             out.append(f"{q['id'][1:]}. {q['text']}{limit} — {q['source']}")
-        out.append("\n(초안 전 — `jobfit run`이 초안 단계로 이어집니다)")
+        blocker = draft_blocker(project)
+        if blocker:
+            out.append(f"\n초안은 쓰지 않습니다. {blocker}. 초안은 원안 자소서의 문체·흐름에 내 경험 카드를 맞춰 쓰는 것이라, 원안 없이 처음부터 쓰지 않습니다.")
+        else:
+            out.append("\n(초안 전 — `jobfit run`이 초안 단계로 이어집니다)")
     else:
         if job.steps.get("draft", {}).get("revised"):
             out.append("검사에 걸린 문항을 한 번 고쳐 받았습니다. 남은 문제는 각 문항 아래에 있습니다.")
@@ -183,6 +188,8 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
         if confirm:
             notes.append(f"초안의 [확인 필요] {confirm}곳 — 사실을 채우거나 문장을 빼세요")
         notes.append("초안은 그대로 내지 말고 내 말투로 다시 다듬으세요")
+        if is_draft_rules(project.me_dir):
+            notes.append("초안이 따른 문체 규칙(me/style/style_rules.md)은 AI가 원안에서 정리한 초안 그대로입니다 — 읽고 고친 뒤 맨 위 안내 줄을 지우면 확정")
     notes.extend(resume_problems)
     if example_note(all_resume, resume_examples):
         notes.append(example_note(all_resume, resume_examples))

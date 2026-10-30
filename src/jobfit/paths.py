@@ -13,6 +13,7 @@ from pathlib import Path
 
 JOBS_XLSX = "jobs.xlsx"
 DASHBOARD_XLSX = "dashboard.xlsx"
+SAMPLES_DIRNAME = "자소서"
 
 _UNSAFE = re.compile(r'[\\/:*?"<>|#^\[\]\s]+')
 
@@ -120,6 +121,16 @@ class Project:
     def sources_dir(self) -> Path:
         """경험 카드를 뽑을 내 자료(이력서·포트폴리오·프로젝트 문서). me/ 밖이라 에이전트가 읽을 수 있다."""
         return self.root / "sources"
+
+    @property
+    def samples_dir(self) -> Path:
+        """원안이 될 잘 쓴 자소서(sources/자소서). 문체 분석에만 쓴다 — 남의 자소서일 수 있어 경험 카드·지원서 정보 뽑기에서는 뺀다."""
+        return self.sources_dir / SAMPLES_DIRNAME
+
+    @property
+    def legacy_samples_dir(self) -> Path:
+        """v0.3.1까지의 자소서 샘플 자리(me/samples). 예전 폴더도 계속 읽는다."""
+        return self.me_dir / "samples"
 
     @property
     def exp_dir(self) -> Path:

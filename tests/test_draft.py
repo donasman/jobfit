@@ -50,9 +50,24 @@ GOOD_Q1 = "주문 목록 화면이 느리다는 문의가 반복됐습니다. �
 GOOD_Q2 = "새 팀원이 혼자 세팅하기 어려웠습니다. 막힌 지점을 기록해 문서를 정리했고 세팅 소요가 3일에서 1일로 줄었습니다. [확인 필요: 문서를 본 인원]"
 
 
-def _project(tmp_path) -> Project:
+ORIGINAL = "저는 문제를 먼저 정의합니다. 그래서 로그부터 봤습니다.\n\n그 결과 원인을 찾았습니다. 이후 팀에 공유했습니다."
+RULES = "# 문체 규칙\n## 쓰는 방식\n- 결론부터, 사건 순서대로\n## 피하는 표현\n- \"열심히 노력했습니다\" — 추상적\n## 대표 문단\n문단입니다."
+
+
+def _original(project: Project, rules: str | None = RULES) -> None:
+    """초안의 원안 — sources/자소서/ 의 잘 쓴 자소서와 그 문체 규칙."""
+    project.samples_dir.mkdir(parents=True, exist_ok=True)
+    (project.samples_dir / "원안1.txt").write_text(ORIGINAL, encoding="utf-8")
+    if rules is not None:
+        (project.me_dir / "style").mkdir(parents=True, exist_ok=True)
+        (project.me_dir / "style" / "style_rules.md").write_text(rules, encoding="utf-8")
+
+
+def _project(tmp_path, original: bool = True) -> Project:
     project = Project(tmp_path)
     assert cli.main(["--root", str(tmp_path), "init"]) == 0
+    if original:
+        _original(project)
     assert cli.main(["--root", str(tmp_path), "add", URL, "--company", "예시랩", "--title", "백엔드 개발자", "--deadline", "2026-10-27"]) == 0
     job_dir = project.job_dir(KEY)
     job_dir.mkdir(parents=True)
@@ -184,6 +199,68 @@ def test_cache_and_rewrite_task(tmp_path, capsys):
     assert job.status == "AI대기" and "draft" in job.force_steps
     cli.main(["--root", str(tmp_path), "accept", "--file", _answer(tmp_path, f"=== q1 ===\n{GOOD_Q1}\n=== q2 ===\n{GOOD_Q2}", "n.txt")])
     assert "draft" not in _job(project).force_steps
+
+
+def test_no_original_means_no_draft(tmp_path, capsys):
+    # 초안은 원안 자소서의 문체·흐름에 내 경험을 맞추는 것 — 원안 없이 처음부터 쓰지 않는다
+    project = _project(tmp_path, original=False)
+    job = _job(project)
+    assert job.status == "원안대기" and not job.step_done("draft")
+    assert not (project.ai_dir(KEY) / "draft.prompt.md").exists()
+    report = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "초안은 쓰지 않습니다. 원안이 될 자소서가 없습니다" in report
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    out = capsys.readouterr().out
+    assert "예시랩: 초안은 쓰지 않습니다. 원안이 될 자소서가 없습니다" in out
+    assert "초안을 쓰려면 원안이 될 자소서가 필요합니다 — sources/자소서/" in out  # [사용자에게 전할 것]
+    assert cli.main(["--root", str(tmp_path), "prep", "draft", "--job", KEY]) == 1
+    ws = load_workbook(project.dashboard_xlsx)["검토"]
+    header = [c.value for c in ws[1]]
+    assert ws.cell(row=2, column=header.index("초안") + 1).value == "원안 자소서 없음"
+
+
+def test_original_then_style_rules_then_draft(tmp_path, capsys):
+    project = _project(tmp_path, original=False)
+    _original(project, rules=None)
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "run"])
+    out = capsys.readouterr().out
+    assert "문체: 원안 자소서 1개로 수치를 다시 쟀습니다" in out and "output/_style/style-rules.prompt.md" in out
+    assert "원안 자소서의 문체·흐름 분석(문체 규칙 만들기) — AI 단계입니다" in out  # next 가 공고보다 먼저 안내
+    assert (project.me_dir / "style" / "style_stats.json").exists() and _job(project).status == "원안대기"
+    # 메뉴 10(prep --copy)·11(accept --paste)처럼 단계를 주지 않아도 문체 규칙으로 간다
+    assert cli.main(["--root", str(tmp_path), "prep"]) == 0
+    assert "style-rules.prompt.md" in capsys.readouterr().out
+    assert cli.main(["--root", str(tmp_path), "accept", "--file", _answer(tmp_path, RULES)]) == 0
+    assert "다음: jobfit run" in capsys.readouterr().out
+    cli.main(["--root", str(tmp_path), "run"])
+    job = _job(project)
+    assert job.status == "AI대기" and job.steps["draft"]["phase"] == "draft"
+    prompt = (project.ai_dir(KEY) / "draft.prompt.md").read_text(encoding="utf-8")
+    assert "결론부터, 사건 순서대로" in prompt and "옮겨 쓰지 않습니다" in prompt
+    assert "AI가 쓴 초안입니다" not in prompt  # 규칙 파일의 안내 줄은 프롬프트에 넣지 않는다
+    cli.main(["--root", str(tmp_path), "accept", "--file", _answer(tmp_path, f"=== q1 ===\n{GOOD_Q1}\n=== q2 ===\n{GOOD_Q2}", "d.txt")])
+    report = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
+    assert "AI가 원안에서 정리한 초안 그대로입니다" in report  # 확정 전 규칙으로 쓴 초안
+
+
+def test_originals_are_style_only_and_old_folder_still_counts(tmp_path):
+    from jobfit.ai.exp_extract import list_sources
+    from jobfit.style import NO_RULES, draft_blocker, list_samples
+
+    cli.main(["--root", str(tmp_path), "init"])
+    project = Project(tmp_path)
+    assert project.samples_dir.is_dir()  # init 이 만든다
+    (project.sources_dir / "이력서.txt").write_text("이력서", encoding="utf-8")
+    (project.samples_dir / "합격자소서.txt").write_text(ORIGINAL, encoding="utf-8")
+    # 남의 자소서일 수 있어 경험 카드·지원서 정보 자료에서는 뺀다
+    assert [p.name for p in list_sources(project)] == ["이력서.txt"]
+    (project.me_dir / "samples").mkdir()
+    (project.me_dir / "samples" / "예전.txt").write_text("다른 글입니다.", encoding="utf-8")
+    (project.me_dir / "samples" / "같은글.txt").write_text(ORIGINAL, encoding="utf-8")  # 같은 내용은 한 번만
+    assert sorted(p.name for p in list_samples(project)) == ["예전.txt", "합격자소서.txt"]
+    assert draft_blocker(project) == NO_RULES
 
 
 def test_parse_answers_edge_cases():

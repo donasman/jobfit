@@ -40,9 +40,8 @@ def test_read_docx_and_hwpx(tmp_path):
 def test_style_stats_and_rules_commands(tmp_path, capsys):
     assert cli.main(["--root", str(tmp_path), "init"]) == 0
     project = Project(tmp_path)
-    assert cli.main(["--root", str(tmp_path), "style", "stats"]) == 1  # 샘플 없음
-    (project.me_dir / "samples").mkdir()
-    (project.me_dir / "samples" / "s1.txt").write_text(SAMPLE, encoding="utf-8")
+    assert cli.main(["--root", str(tmp_path), "style", "stats"]) == 1  # 원안 없음
+    (project.samples_dir / "s1.txt").write_text(SAMPLE, encoding="utf-8")
     assert cli.main(["--root", str(tmp_path), "style", "stats"]) == 0
     assert (project.me_dir / "style" / "style_stats.json").exists()
     assert "5개 미만" in capsys.readouterr().out

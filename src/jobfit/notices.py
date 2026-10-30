@@ -18,7 +18,8 @@ from jobfit.paths import Project
 from jobfit.profile import example_note as profile_example_note
 from jobfit.profile import load_profile
 from jobfit.profile import split_examples as profile_split_examples
-from jobfit.state import STATUS_ERROR, State
+from jobfit.state import STATUS_ERROR, STATUS_NEED_SAMPLES, State
+from jobfit.style import list_samples
 
 HEADER = "[사용자에게 전할 것] 에이전트는 아래 줄을 요약하지 말고 빠짐없이 그대로 사용자에게 전하세요 — 사람이 직접 해야 하는 일입니다"
 LOOSE_STAR = "star에 facts에 없는 숫자가 있습니다"
@@ -112,6 +113,12 @@ def collect(project: Project, state: State | None = None) -> list[str]:
                 "공고 본문을 붙여 넣어야 합니다: " + ", ".join(f"{j.company}({j.error})" for j in paste[:MAX_LISTED])
                 + (f" 외 {len(paste) - MAX_LISTED}개" if len(paste) > MAX_LISTED else "")
                 + f" — 브라우저에서 본문을 복사해 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}로 넣으세요. {HANDOFF_TIP}"
+            )
+        no_sample = [j for j in sorted(state.active_jobs(), key=lambda j: j.row) if j.status == STATUS_NEED_SAMPLES]
+        if no_sample and not list_samples(project):
+            out.append(
+                f"초안을 쓰려면 원안이 될 자소서가 필요합니다 — {project.rel(project.samples_dir)}/ 에 잘 쓴 자소서(남의 합격 자소서도 됩니다)를 넣고 "
+                f"{menunum.at(menunum.RUN, '공고 처리 진행')}. 초안은 그 문체·흐름에 내 경험 카드를 맞춰 씁니다. 기다리는 공고: {_ids([j.company for j in no_sample])}"
             )
 
     if state is not None and state.sheet_errors:

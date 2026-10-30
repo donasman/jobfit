@@ -1,5 +1,6 @@
-"""문체 규칙(AI 1회, 공고와 무관) — 자소서 샘플 발췌 + 문체 수치 → me/style/style_rules.md 초안.
+"""문체 규칙(AI 1회, 공고와 무관) — 원안 자소서 발췌 + 문체 수치 → me/style/style_rules.md 초안.
 
+초안은 이 규칙이 있어야 쓴다(style.draft_blocker). 원안이 있고 규칙이 없으면 `run`이 프롬프트를 만들고 `next`가 이 단계를 안내한다.
 AI가 쓴 규칙은 사람이 읽고 고쳐서 확정한다. 이미 style_rules.md 가 있으면 덮어쓰지 않고 style_rules.new.md 로 둔다.
 프롬프트는 output/_style/ 에 둔다(에이전트는 me/ 를 읽지 못하므로).
 """
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from jobfit.ai.promptfile import LIMITS, load_template, log_usage, render
 from jobfit.paths import Project
-from jobfit.style import compute_stats, list_samples, read_sample, stats_lines, style_dir
+from jobfit.style import NO_SAMPLES, RULES_DRAFT_HEADER, compute_stats, list_samples, read_sample, stats_lines, style_dir
 
 STEP = "style-rules"
 FILE_PROMPT = "style-rules.prompt.md"
@@ -36,9 +37,9 @@ def work_dir(project: Project) -> Path:
 
 def prepare(project: Project) -> tuple[Path | None, str]:
     """(프롬프트 경로, 문제). 샘플이 없으면 경로 없이 문제만."""
-    samples = list_samples(project.me_dir)
+    samples = list_samples(project)
     if not samples:
-        return None, "me/samples/ 에 내가 쓴 자소서(.txt · .md · .docx · .hwpx)를 넣어 주세요"
+        return None, NO_SAMPLES
     texts = [t for t in (read_sample(p) for p in samples) if t.strip()]
     if not texts:
         return None, "샘플에서 글자를 읽지 못했습니다(.hwp는 .hwpx나 .txt로 바꿔 주세요)"
@@ -92,6 +93,5 @@ def accept(project: Project, raw: str | None = None) -> StyleResult:
     if target.exists():
         target = target_dir / "style_rules.new.md"
         warnings.append("style_rules.md 가 이미 있어 style_rules.new.md 로 저장했습니다 — 비교해서 고른 쪽을 style_rules.md 로")
-    header = "<!-- AI가 쓴 초안입니다. 읽고 고친 뒤 이 줄을 지우면 확정입니다. -->\n"
-    target.write_text(header + text + "\n", encoding="utf-8")
+    target.write_text(RULES_DRAFT_HEADER + "\n" + text + "\n", encoding="utf-8")
     return StyleResult(ok=True, path=target, warnings=warnings)

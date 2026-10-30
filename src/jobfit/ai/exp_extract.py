@@ -102,10 +102,15 @@ def _text_cache(project: Project, slug: str) -> Path:
 
 
 def list_sources(project: Project) -> list[Path]:
+    """경험 카드·지원서 정보를 뽑을 자료. sources/자소서/ 는 뺀다 — 문체 원안용이라 남의 자소서일 수 있다(남의 경험이 내 카드가 된다)."""
     d = project.sources_dir
     if not d.is_dir():
         return []
-    return sorted(p for p in d.rglob("*") if p.is_file() and not any(part.startswith(".") for part in p.relative_to(d).parts))
+    samples = project.samples_dir
+    return sorted(
+        p for p in d.rglob("*")
+        if p.is_file() and not any(part.startswith(".") for part in p.relative_to(d).parts) and not p.is_relative_to(samples)
+    )
 
 
 def scan(project: Project, force: bool = False) -> ScanReport:

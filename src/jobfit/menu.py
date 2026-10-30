@@ -59,8 +59,8 @@ ME_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
         (5, "지원서 정보 만들기 준비", "이력서를 읽어 AI 단계 직전까지"),
         (6, "지원서 정보 검사", ""),
     ]),
-    ("문체", [
-        (7, "문체 수치 계산", "me/samples 의 내 자소서"),
+    ("원안 자소서 (초안이 따를 문체·흐름)", [
+        (7, "원안 자소서 분석 준비", "sources/자소서 의 잘 쓴 자소서"),
         (8, "문체 규칙: 프롬프트 복사", "웹 채팅용"),
         (9, "문체 규칙: 답 붙여넣기", "웹 채팅용"),
     ]),
@@ -70,8 +70,8 @@ ME_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
 ]
 ME_NOTE = f"웹 채팅에서는 경험 카드·지원서 정보 프롬프트도\n메인 메뉴 {M.PROMPT}번(복사)·{M.ANSWER}번(붙여넣기)으로"
 STYLE_AGENT = (
-    "me/samples 의 내 자소서로 문체 수치를 계산했어. `uv run jobfit prep style-rules`로 문체 규칙 프롬프트를 만들고, "
-    "그 프롬프트대로 답을 쓴 뒤 `uv run jobfit accept style-rules`까지 해줘."
+    "sources/자소서 의 원안 자소서로 문체 수치를 계산했어. `uv run jobfit prep style-rules`로 문체 규칙 프롬프트를 만들고, "
+    "그 프롬프트대로 답을 쓴 뒤 `uv run jobfit accept style-rules`까지 해줘. 초안을 기다리던 공고가 있으면 `uv run jobfit run`으로 이어서."
 )
 
 Ask = Callable[[str], str]
@@ -185,7 +185,8 @@ class _Menu:
             self.console.rule(style="dim")
             if choice == 1:
                 _open(self.project.sources_dir)
-                self._hint("자료를 넣은 뒤 2번(경험 카드 만들기 준비)·5번(지원서 정보 만들기 준비)을 누르면 에이전트에게 보낼 말이 나옵니다")
+                self._hint("자료를 넣은 뒤 2번(경험 카드 만들기 준비)·5번(지원서 정보 만들기 준비)을 누르면 에이전트에게 보낼 말이 나옵니다. "
+                           "잘 쓴 자소서는 sources/자소서 에 넣고 7번 — 초안은 그 문체·흐름을 따릅니다(경험 카드로는 뽑지 않습니다)")
             elif choice == 2:
                 self._step(["exp", "extract"], "자료 읽는 중…", "sources 에 새 자료를 넣었어.")
             elif choice == 3:

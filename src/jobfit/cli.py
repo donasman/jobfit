@@ -13,6 +13,7 @@ from jobfit import jobkey, menunum, pipeline
 from jobfit.excel.workbook import create_jobs_workbook
 from jobfit.paths import Project
 from jobfit.state import APPLY_VIAS, STATUS_AI, STATUS_REVIEW, STATUS_RUNNING, State
+from jobfit.style import draft_blocker, style_pending
 
 UNIMPLEMENTED: dict[str, str] = {}
 # 단계별 실행 명령이 먼저 끝나 있어야 하는 단계
@@ -46,10 +47,10 @@ def cmd_init(project: Project, args) -> int:
     else:
         create_jobs_workbook(project.jobs_xlsx)
         made.append(project.jobs_xlsx.name)
-    for d in (project.output_dir, project.state_dir, project.sources_dir):
+    for d in (project.output_dir, project.state_dir, project.sources_dir, project.samples_dir):
         if not d.exists():
             d.mkdir(parents=True)
-            made.append(d.name + "/")
+            made.append(project.rel(d) + "/")
     if not project.me_dir.exists():
         if project.me_example_dir.is_dir():
             shutil.copytree(project.me_example_dir, project.me_dir)
@@ -61,6 +62,7 @@ def cmd_init(project: Project, args) -> int:
         State().save(project.state_file)
     print("만든 것: " + (", ".join(made) if made else "없음(모두 있었음)"))
     print("다음: 내 이력서·포트폴리오·프로젝트 문서를 sources/ 에 넣고  jobfit exp extract  (경험 카드 만들기)")
+    print(f"      원안이 될 잘 쓴 자소서는 {project.rel(project.samples_dir)}/ 에 — 초안은 그 문체·흐름에 내 경험을 맞춰 씁니다(없으면 초안을 쓰지 않습니다)")
     print("      공고는 jobs.xlsx 공고 시트에 적고  jobfit run")
     return 0
 
@@ -373,6 +375,8 @@ def cmd_prep(project: Project, args) -> int:
         return _prep_style(project, args)
     if step == "exp-extract" or (step is None and not args.job and _exp_pending(project)):
         return _prep_exp(project, args)  # 경험 카드가 매칭에 쓰이므로 공고보다 먼저
+    if step is None and not args.job and style_pending(project):
+        return _prep_style(project, args)  # 문체 분석은 초안에 쓰이므로 공고보다 먼저(next 와 같은 순서)
     if step == "profile-extract" or (step is None and not args.job and _profile_pending(project) and _waiting_job(State.load(project.state_file)) is None):
         return _prep_profile(project, args)
     state = State.load(project.state_file)
@@ -388,6 +392,9 @@ def cmd_prep(project: Project, args) -> int:
         return 1
     if step == "draft" and not load_match(project, job).get("questions"):
         print(f"{job.company}: 문항이 없어 초안을 만들지 않습니다. jobs.xlsx 문항 시트에 입력하고  jobfit run")
+        return 1
+    if step == "draft" and draft_blocker(project):
+        print(f"{job.company}: 초안은 쓰지 않습니다. {draft_blocker(project)}")
         return 1
     if job.step_done(step) and not args.force:
         print(f"{job.company}: 이미 끝난 단계입니다({step}). 다시 하려면 --force")
@@ -422,6 +429,8 @@ def cmd_accept(project: Project, args) -> int:
     if step == "style-rules":
         return _accept_style(project, args)
     target = step if step in ("exp-extract", "profile-extract") else (_accept_target(project) if step is None and not args.job else None)
+    if target == "style-rules":
+        return _accept_style(project, args)
     if target == "exp-extract":
         return _accept_exp(project, args)
     if target == "profile-extract":
@@ -540,17 +549,23 @@ def _profile_pending(project: Project) -> bool:
 
 def _accept_target(project: Project) -> str | None:
     """단계를 안 주고 답을 붙여넣었을 때 보낼 곳. 마지막으로 보여 준 프롬프트를 따르고, 모르면 경험 카드 → 공고 → 지원서 정보."""
-    exp, prof = _exp_pending(project), _profile_pending(project)
+    from jobfit.ai import style_rules
+
+    exp, prof, sty = _exp_pending(project), _profile_pending(project), style_pending(project)
     last = _last_prompt(project) or ""
     if exp and last.startswith(project.rel(project.exp_dir)):
         return "exp-extract"
     if prof and last.startswith(project.rel(project.profile_dir)):
         return "profile-extract"
+    if sty and last.startswith(project.rel(style_rules.work_dir(project))):
+        return "style-rules"
     waiting = _waiting_job(State.load(project.state_file)) is not None
     if "/_ai/" in last and waiting:
         return None
     if exp:
         return "exp-extract"
+    if sty:
+        return "style-rules"
     if prof and not waiting:
         return "profile-extract"
     return None
@@ -761,6 +776,7 @@ def _prep_style(project: Project, args) -> int:
         print(note)
         return 1
     print(f"문체 규칙 프롬프트: {project.rel(path)} ({note})")
+    _remember_prompt(project, path)
     return _copy_prompt(path, args.copy, copy_to_clipboard)
 
 
@@ -778,33 +794,24 @@ def _accept_style(project: Project, args) -> int:
     print(f"문체 규칙 초안을 저장했습니다: {project.rel(result.path)}")
     for w in result.warnings:
         print(f"  ! {w}")
-    print("읽고 고친 뒤 맨 위 안내 줄을 지우면 확정입니다. 다음 초안부터 반영됩니다")
+    print("읽고 고친 뒤 맨 위 안내 줄을 지우면 확정입니다. 초안은 이 규칙을 따라 씁니다")
+    print("다음: jobfit run  (초안을 기다리던 공고가 이어집니다)")
     _print_notices(project, None)
     return 0
 
 
 def cmd_style(project: Project, args) -> int:
-    """문체 통계 — me/samples/ 의 자소서에서 계산해 me/style/style_stats.json 에 쓴다. AI 없음."""
-    import json
+    """문체 통계 — 원안 자소서(sources/자소서/, 예전 me/samples/)에서 계산해 me/style/style_stats.json 에 쓴다. AI 없음."""
+    from jobfit.style import MIN_SAMPLES_FOR_LINT, NO_SAMPLES, list_samples, stats_lines, style_dir, write_stats
 
-    from jobfit.style import MIN_SAMPLES_FOR_LINT, compute_stats, list_samples, read_sample, stats_lines, style_dir
-
-    samples = list_samples(project.me_dir)
+    samples = list_samples(project)
     if not samples:
-        print("me/samples/ 에 내가 쓴 자소서(.txt · .md · .docx · .hwpx)를 넣어 주세요")
+        print(NO_SAMPLES)
         return 1
-    texts = []
-    for p in samples:
-        text = read_sample(p)
-        if text.strip():
-            texts.append(text)
-        else:
-            print(f"  ! 글자를 읽지 못해 뺐습니다: {p.name}")
-    stats = compute_stats(texts)
-    out = style_dir(project.me_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "style_stats.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"샘플 {stats['samples']}개 · 문장 {stats['sentences']}개 → {project.rel(out / 'style_stats.json')}")
+    stats, unreadable = write_stats(project, samples)
+    for name in unreadable:
+        print(f"  ! 글자를 읽지 못해 뺐습니다: {name}")
+    print(f"원안 {stats['samples']}개 · 문장 {stats['sentences']}개 → {project.rel(style_dir(project.me_dir) / 'style_stats.json')}")
     for line in stats_lines(stats):
         print(f"  {line[2:]}")
     if stats["samples"] < MIN_SAMPLES_FOR_LINT:

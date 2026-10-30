@@ -5,6 +5,8 @@
 ## 진행
 1. 요청을 받을 때마다(같은 대화에서 이어진 요청도) 먼저 `uv run jobfit next`를 실행하고 그 출력을 따른다. 앞에서 본 출력·상태로 답하지 않는다 — 사용자가 그 사이에 `jobs.xlsx`·`me/`·`sources/`를 고쳤을 수 있다(메뉴로 문항·공고를 넣는 일이 많다). 사용자가 공고 링크를 주면 먼저 `uv run jobfit add "<링크>"`로 추가한 뒤 `uv run jobfit run`.
    - 사용자가 경험 카드를 만들어 달라고 하거나 `sources/`에 자료를 넣었다고 하면 `uv run jobfit exp extract`를 실행한다. 경험 카드는 매칭에 쓰이므로 공고보다 먼저 한다.
+   - `sources/자소서/`는 초안의 원안이 될 잘 쓴 자소서 자리다(경험 카드로 뽑지 않는다). 사용자가 거기에 넣었다고 하면 `uv run jobfit run` 뒤 `next`를 따른다 — 문체 분석 AI 단계가 나온다.
+   - 원안 자소서가 없어 "초안은 쓰지 않습니다"가 나오면 초안을 직접 쓰지 않는다. 원안 없이 처음부터 쓰는 것은 이 도구의 방향이 아니다 — 그 안내를 사용자에게 전한다.
    - 사용자가 지원서 정보(학력·자격증·어학 등)를 만들어 달라고 하면 `uv run jobfit profile extract`, 지원서 입력표를 달라고 하면 `uv run jobfit apply sheet --job <공고키>`. 입력표에는 신원 정보가 없다 — 이름·연락처·주소·생년월일은 사용자가 지원서에 직접 넣는다.
 2. 스크립트로 할 수 있는 단계는 반드시 스크립트로 한다. 스크립트가 만드는 파일(`meta.json`, `analysis.json`, `match.json`, `lint.json`, `drafts/`, `report.md`, `dashboard.xlsx`)을 손으로 만들거나 고치지 않는다.
 3. 명령은 `uv run jobfit …`만 쓴다. 글자수·숫자 검사는 `accept`가 한다 — 답을 쓰기 전에 직접 세거나 다른 스크립트로 확인하지 않는다.
@@ -15,7 +17,7 @@
 6. 응답 파일을 쓴 뒤 바로 해당 `uv run jobfit accept <단계> --job <공고키>`를 실행한다.
    - 실패하면 생성된 재요청 프롬프트(`_ai/<단계>.retry.prompt.md`)를 읽고 같은 응답 파일에 다시 써서 한 번만 다시 시도한다. 그래도 실패하면 멈추고 사용자에게 알린다.
    - 초안 단계에서 `accept draft`가 "수정 프롬프트"를 만들면 `_ai/revise.prompt.md`를 읽고 `_ai/revise.response.md`에 써서 `accept draft`를 한 번 더 실행한다. 수정은 한 번뿐이다.
-   - 문체 규칙을 요청받으면 `uv run jobfit prep style-rules`가 만든 `output/_style/style-rules.prompt.md`를 읽고 `output/_style/style-rules.response.md`에 써서 `uv run jobfit accept style-rules`.
+   - 문체 분석(문체 규칙)은 `next`가 안내하거나 요청받으면 `uv run jobfit prep style-rules`가 만든 `output/_style/style-rules.prompt.md`를 읽고 `output/_style/style-rules.response.md`에 써서 `uv run jobfit accept style-rules`, 이어서 `uv run jobfit run`. 원안의 경험 내용은 규칙에 옮기지 않는다.
    - 지원서 정보 뽑기는 `output/_profile/_ai/profile-*.prompt.md`를 하나씩 읽고, 첫 줄이 지정한 답 파일에 써서 `uv run jobfit accept profile-extract`. 자료에 적힌 것만, 신원 정보는 쓰지 않는다.
    - 경험 카드 뽑기는 `output/_exp/_ai/extract-*.prompt.md`를 하나씩 읽고, 첫 줄이 지정한 답 파일에 써서 `uv run jobfit accept exp-extract`(공고키 없음). 남은 조각이 있으면 `accept`가 알려 준다 — 하나씩 끝까지. 답은 자료에 적힌 것만, 숫자는 자료 표기 그대로.
 7. 프롬프트의 '쓸 수 있는 사실'에 없는 숫자는 쓰지 않는다. 모르면 `[확인 필요: 무엇]`.

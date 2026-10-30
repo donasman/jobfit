@@ -3,6 +3,7 @@
 import io
 
 from rich.console import Console
+from test_draft import _original
 from test_report_dashboard import KEY, _job, _project
 
 from jobfit import cli, handoff, menu, pipeline
@@ -79,12 +80,17 @@ def test_handoff_for_human_and_agent_steps(tmp_path):
     cli.main(["--root", str(tmp_path), "question", "add", "--job", KEY, "--text", "어려운 문제를 해결한 경험", "--limit", "700"])
     cli.main(["--root", str(tmp_path), "run"])
     h = handoff.build(project, State.load(project.state_file), "예시랩 문항 1개를 넣었어.")
+    assert not h.agent and "원안이 될 자소서가 필요합니다 — sources/자소서/" in h.human  # 원안 없이는 초안을 쓰지 않는다
+    _original(project)
+    cli.main(["--root", str(tmp_path), "run"])
+    h = handoff.build(project, State.load(project.state_file), "예시랩 문항 1개를 넣었어.")
     assert h.agent.startswith("예시랩 문항 1개를 넣었어. 이전 대화에서 본 상태는 믿지 말고 `uv run jobfit next`부터 다시 실행해서")
     assert h.agent.endswith("(지금 다음 할 일: 예시랩 초안 작성)") and h.web_chat
 
 
 def test_menu_question_flow_ends_with_message_for_agent(tmp_path):
     project = _project(tmp_path)
+    _original(project)
     copied = []
     screen = _run_menu(project, ["2", "어려운 문제를 해결한 경험을 적어주세요", "700", "", "", "0"], copied)
     assert "문항을 넣을 공고: 예시랩 / 백엔드 개발자" in screen

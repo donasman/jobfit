@@ -13,7 +13,7 @@ from jobfit import menunum, pipeline
 from jobfit.fetch.company import CLOSED_MARK
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
 from jobfit.paths import Project
-from jobfit.state import STEPS, State
+from jobfit.state import STATUS_NEED_SAMPLES, STEPS, State
 
 AGENT_RULE = "이전 대화에서 본 상태는 믿지 말고 `uv run jobfit next`부터 다시 실행해서, 안내대로 끝까지 이어서 진행해줘."
 STEP_NAMES = {"fetch": "공고 받기", "clean": "공고 정리", "analyze": "공고 분석", "match": "매칭", "report": "report", "draft": "초안 작성"}
@@ -42,6 +42,9 @@ def build(project: Project, state: State, did: str = "") -> Handoff:
                            f"본문을 갖고 있으면 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}")
         return Handoff(human=f"{job.company}: 공고 본문을 붙여 넣어야 합니다 — 브라우저에서 본문을 복사한 뒤 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}")
     if action.kind == "edit":
+        if job is not None and job.status == STATUS_NEED_SAMPLES:
+            return Handoff(human=f"{job.company}: 초안을 쓰려면 원안이 될 자소서가 필요합니다 — {project.rel(project.samples_dir)}/ 에 잘 쓴 자소서를 넣고 "
+                           f"{menunum.at(menunum.RUN, '공고 처리 진행')}")
         if job is not None:
             return Handoff(human=f"{job.company}: 공고에 자소서 문항이 없습니다 — 문항이 있으면 {menunum.at(menunum.QUESTIONS, '문항 넣기')}로 넣으세요. "
                            "문항이 없는 공고면 report.md가 결과입니다")
@@ -52,6 +55,8 @@ def build(project: Project, state: State, did: str = "") -> Handoff:
 def _todo(action: pipeline.Action) -> str:
     job = action.job
     if job is None:
+        if "style-rules" in action.command:
+            return "원안 자소서 문체 분석"
         return "지원서 정보 만들기" if "profile" in action.command else "경험 카드 만들기"
     pending = [s for s in STEPS if not job.step_done(s)]
     if action.kind == "ai" and pending:

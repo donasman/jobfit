@@ -21,6 +21,7 @@ STATUS_WAITING = "대기"
 STATUS_RUNNING = "처리중"
 STATUS_AI = "AI대기"
 STATUS_NEED_QUESTIONS = "문항대기"
+STATUS_NEED_SAMPLES = "원안대기"  # 문항은 있는데 원안 자소서(또는 그 문체 분석)가 없어 초안을 쓰지 않은 상태
 STATUS_REVIEW = "검토대기"
 STATUS_ERROR = "오류"
 

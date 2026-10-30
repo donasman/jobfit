@@ -21,7 +21,7 @@ from jobfit.excel.append import lock_files
 from jobfit.match import load_analysis, load_match
 from jobfit.paths import Project
 from jobfit.report import FILE_REPORT, apply_channel
-from jobfit.state import DECISIONS_CLOSED, DECISIONS_PAUSED, STATUS_AI, STATUS_NEED_QUESTIONS, STATUS_REVIEW, Job, State
+from jobfit.state import DECISIONS_CLOSED, DECISIONS_PAUSED, STATUS_AI, STATUS_NEED_QUESTIONS, STATUS_NEED_SAMPLES, STATUS_REVIEW, Job, State
 
 SHEET_REVIEW = "검토"
 SHEET_INPUT = "입력 문제"
@@ -108,6 +108,8 @@ def _row(project: Project, job: Job) -> list:
         q_text = f"{n}개 ({source})"
     if job.step_done("draft"):
         draft = lint_summary(load_lint(project, job))
+    elif job.status == STATUS_NEED_SAMPLES:
+        draft = "원안 자소서 없음"
     else:
         draft = "문항 없음" if job.step_done("report") and n == 0 else ""
     score = match.get("score") if match else None
@@ -140,6 +142,8 @@ def _next(job: Job) -> str:
         return job.next_hint or f"AI 프롬프트 복사 (메뉴 {menunum.PROMPT})"
     if job.status == STATUS_NEED_QUESTIONS:
         return "문항 시트에 문항 입력, 또는 결정 열에서 지원 여부 결정"
+    if job.status == STATUS_NEED_SAMPLES:
+        return job.next_hint
     if job.status == STATUS_REVIEW:
         return "report.md 확인 후 결정 열에서 지원 여부 결정"
     return job.next_hint

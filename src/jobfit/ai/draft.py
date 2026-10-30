@@ -25,7 +25,7 @@ from jobfit.paths import Project
 from jobfit.profile import load_profile, school_names
 from jobfit.report import write_report
 from jobfit.state import Job, now
-from jobfit.style import forbidden_expressions, load_rules, load_stats, stats_lines
+from jobfit.style import RULES_DRAFT_HEADER, forbidden_expressions, load_rules, load_stats, stats_lines
 
 STEP = "draft"
 FILE_PROMPT = "draft.prompt.md"
@@ -104,8 +104,8 @@ def build_prompt(project: Project, job: Job, compact: int = 0) -> str:
     for label, key in (("필수", "must"), ("주요 업무", "duties"), ("인재상", "values")):
         if analysis.get(key):
             summary.append(f"- {label}: " + "; ".join(analysis[key]))
-    rules = load_rules(project.me_dir).strip()
-    style = rules or "(문체 규칙 없음 — 자연스러운 경어체 '~습니다'로)"
+    # 문체 규칙이 없으면 여기까지 오지 않는다(style.draft_blocker) — 원안 없이 처음부터 쓰지 않는다
+    style = load_rules(project.me_dir).replace(RULES_DRAFT_HEADER, "").strip()
     lines = stats_lines(load_stats(project.me_dir))
     if lines:
         style += "\n\n스크립트가 잰 내 문체 수치:\n" + "\n".join(lines)

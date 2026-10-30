@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from jobfit import jobkey, menunum
-from jobfit.ai import analyze, draft, exp_extract, profile_extract
+from jobfit.ai import analyze, draft, exp_extract, profile_extract, style_rules
 from jobfit.clean.posting import FILE_POSTING, clean_job
 from jobfit.dashboard import DashboardBusy, build_dashboard
 from jobfit.excel.reader import JobRow, QuestionRow, ReadResult, read_jobs_workbook
@@ -22,10 +22,12 @@ from jobfit.fetch.fetcher import FILE_MAIN, FILE_META, NETWORK_ERROR_MARK, fetch
 from jobfit.match import inputs_sha, load_match, run_match
 from jobfit.paths import Project
 from jobfit.report import FILE_REPORT, write_report
+from jobfit.style import draft_blocker, refresh_stats, style_pending
 from jobfit.state import (
     STATUS_AI,
     STATUS_ERROR,
     STATUS_NEED_QUESTIONS,
+    STATUS_NEED_SAMPLES,
     STATUS_REVIEW,
     STATUS_RUNNING,
     STATUS_WAITING,
@@ -175,12 +177,29 @@ def run(project: Project, state: State, only: Job | None = None) -> list[str]:
             lines.append(f"경험 카드: sources/ 자료 조각 {len(report.pending)}개가 AI 단계를 기다립니다")
         for rel, why in report.skipped:
             lines.append(f"경험 카드: {rel} 건너뜀 — {why}")
+    lines += _prepare_style(project)
     for job in targets:
         if not job.is_active:
             lines.append(f"{job.company}: 결정이 '{job.decision}'이라 건너뜀")
             continue
         lines.append(_run_job(project, job))
     lines.append(refresh_dashboard(project, state))
+    return lines
+
+
+def _prepare_style(project: Project) -> list[str]:
+    """원안 자소서가 바뀌었으면 문체 수치를 다시 재고, 문체 규칙이 아직이면 그 프롬프트를 만들어 둔다(AI 단계 직전까지)."""
+    lines = []
+    stats = refresh_stats(project)
+    if stats is not None:
+        lines.append(f"문체: 원안 자소서 {stats['samples']}개로 수치를 다시 쟀습니다")
+    if style_pending(project):
+        prompt = style_rules.work_dir(project) / style_rules.FILE_PROMPT
+        if stats is not None or not prompt.exists():
+            path, note = style_rules.prepare(project)
+            if path is None:
+                return lines + [f"문체 분석: {note}"]
+        lines.append(f"문체 분석: 원안 자소서의 문체·흐름을 정리하는 AI 단계입니다. 프롬프트 {project.rel(prompt)} — 초안은 이 분석을 따라 씁니다")
     return lines
 
 
@@ -229,6 +248,13 @@ def _run_job(project: Project, job: Job) -> str:
             job.next_hint = "문항 시트에 문항 입력, 또는 결정 열에서 지원 여부 결정"
             report_path = project.rel(job_dir / FILE_REPORT)
             return f"{job.company}: {prefix}report 완료 — {report_path}. 공고에 자소서 문항이 없어 초안은 만들지 않습니다"
+        if step == "draft":
+            # 초안은 원안 자소서의 문체·흐름에 내 경험을 맞추는 것이다. 원안이나 그 분석이 없으면 처음부터 쓰지 않는다
+            blocker = draft_blocker(project)
+            if blocker:
+                job.status = STATUS_NEED_SAMPLES
+                job.next_hint = blocker
+                return f"{job.company}: {prefix}report 완료 — {project.rel(job_dir / FILE_REPORT)}. 초안은 쓰지 않습니다: {blocker}"
         if step not in IMPLEMENTED:
             job.status = STATUS_RUNNING if job.status != STATUS_ERROR else job.status
             job.next_hint = f"{step} 단계는 아직 구현되지 않았습니다"
@@ -326,13 +352,13 @@ def next_action(project: Project, state: State) -> Action:
     if not project.is_initialized():
         return Action(kind="run", message="처음 설정이 필요합니다", command="jobfit init")
     # 경험 카드가 매칭에 쓰이므로, 같은 급이면 자료 → 공고 순서로 안내한다
-    exp, prof = _exp_action(project), _profile_action(project)
+    exp, sty, prof = _exp_action(project), _style_action(project), _profile_action(project)
     if not state.jobs:
-        mine = [a for a in (exp, prof) if a]
+        mine = [a for a in (exp, sty, prof) if a]
         return min(mine, key=lambda a: _PRIORITY[a.kind]) if mine else Action(kind="edit", message=f'jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>"(메뉴 {menunum.ADD})로 추가한 뒤 jobfit run(메뉴 {menunum.RUN})', command="jobfit run")
-    # 경험 카드는 매칭에 쓰여 공고보다 먼저, 지원서 정보는 입력표에만 쓰여 공고 뒤에
+    # 경험 카드는 매칭에, 문체 분석은 초안에 쓰여 공고보다 먼저, 지원서 정보는 입력표에만 쓰여 공고 뒤에
     jobs = [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
-    actions = ([exp] if exp else []) + jobs + ([prof] if prof else [])
+    actions = ([exp] if exp else []) + ([sty] if sty else []) + jobs + ([prof] if prof else [])
     if actions:
         return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 앞의 것(자료, 그다음 jobs.xlsx 위쪽 공고)
     return Action(kind="done", message="처리할 공고가 없습니다. 새 공고를 jobs.xlsx에 적거나 결정을 미정으로 돌리세요", command="jobfit sync-in")
@@ -355,6 +381,20 @@ def _exp_action(project: Project) -> Action | None:
     if new:
         return Action(kind="run", message=f"sources/ 에 새 자료 {len(new)}개 — 경험 카드로 만들려면", command="jobfit exp extract")
     return None
+
+
+def _style_action(project: Project) -> Action | None:
+    """원안 자소서는 있는데 문체 규칙이 아직이면 그 AI 단계. 초안은 이 규칙이 있어야 쓴다."""
+    if not style_pending(project):
+        return None
+    work = style_rules.work_dir(project)
+    message = (
+        "원안 자소서의 문체·흐름 분석(문체 규칙 만들기) — AI 단계입니다. 초안은 이 분석을 따라 씁니다.\n"
+        f"  붙여넣기 모드: jobfit prep --copy → 웹 채팅에 붙여넣기 → 답 전체 복사 → jobfit accept --paste\n"
+        f"  에이전트 모드: jobfit prep style-rules 로 프롬프트를 만들고 {project.rel(work / style_rules.FILE_PROMPT)} 를 읽고 "
+        f"답을 {project.rel(work / style_rules.FILE_RESPONSE)} 에 쓴 뒤 jobfit accept style-rules"
+    )
+    return Action(kind="ai", message=message, command="jobfit prep style-rules --copy")
 
 
 def _profile_action(project: Project) -> Action | None:
@@ -412,6 +452,12 @@ def _job_action(project: Project, job: Job) -> Action | None:
             f'사용자가 문항 원문을 주면 에이전트가 jobfit question add --job {job.key} --text "<문항>" [--limit 글자수]'
         )
         return Action(kind="edit", message=message, command="jobfit run", job=job)
+    if step == "draft" and job.status == STATUS_NEED_SAMPLES:
+        blocker = draft_blocker(project)
+        if not blocker:
+            return Action(kind="run", message=f"{job.company}: 원안 자소서와 문체 분석이 준비됐습니다 — 초안 단계로", command="jobfit run", job=job)
+        report = project.rel(project.job_dir(job.key) / FILE_REPORT)
+        return Action(kind="edit", message=f"{job.company}: 초안은 쓰지 않습니다. {blocker}. {report} 에서 매칭·강조 포인트를 보세요", command="jobfit run", job=job)
     if step in IMPLEMENTED:
         return Action(kind="run", message=f"{job.company}: {step} 단계부터 실행", command="jobfit run", job=job)
     return Action(kind="unimplemented", message=f"{job.company}: 다음은 {step} 단계인데 이 버전에는 없습니다 (다음 MVP)", job=job)
