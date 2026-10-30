@@ -261,8 +261,21 @@ def test_dashboard_lists_sheet_errors_and_respects_lock(tmp_path, capsys):
     assert project.dashboard_xlsx.read_bytes() == before
 
 
-def test_no_cards_still_gives_report(tmp_path):
+def test_no_cards_still_gives_report(tmp_path, capsys):
+    # 공고 링크 하나로 여기까지 — 다음에 무엇을 넣으면 무엇이 늘어나는지 report 와 안내가 말한다
     project = _project(tmp_path, cards=None)
     text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
     assert "경험 카드가 없어 매칭하지 않았습니다" in text
+    assert "지금은 공고 요건 정리까지입니다. 경험 카드를 넣으면 매칭 점수와 이력서 강조 포인트가, 원안 자소서까지 넣으면 자소서 초안이 나옵니다" in text
     assert _job(project).status == "문항대기"
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    block = capsys.readouterr().out.split(HEADER, 1)[1]
+    assert "지금은 공고 요건 정리까지입니다" in block and "sources/ 에 이력서·포트폴리오를 넣고" in block
+
+
+def test_growth_line_stops_once_there_are_cards(tmp_path, capsys):
+    project = _project(tmp_path)  # CARDS 가 들어 있다
+    capsys.readouterr()
+    cli.main(["--root", str(tmp_path), "next"])
+    assert "지금은 공고 요건 정리까지입니다" not in capsys.readouterr().out

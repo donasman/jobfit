@@ -46,6 +46,9 @@ _BODY_LINE_MAX = 80
 SUMMARY_KEYS = ("경력", "학력", "급여", "연봉", "근무형태", "고용형태", "근무지역", "근무지", "근무요일", "근무시간", "마감일", "접수기간", "접수마감", "직급", "직책", "모집인원", "스킬", "핵심역량", "우대조건")
 _RE_SUMMARY = re.compile(r"^(" + "|".join(SUMMARY_KEYS) + r")\s*(?:\||:|：)\s*(.+)$")
 _SUMMARY_VALUE_MAX = 60
+# 요약 칸이 한 줄에 붙어 오는 곳(잡코리아 meta description "경력 : 신입 , 학력 : 대졸↑, 급여 : …").
+# 쉼표 아무 데서나 자르면 "대학졸업(2,3년)이상"이 깨진다 — 뒤에 요약 키가 오는 쉼표에서만 자른다
+_RE_SUMMARY_JOINED = re.compile(r"\s*,\s*(?=(?:" + "|".join(SUMMARY_KEYS) + r")\s*(?:\||:|：))")
 
 # 메뉴·푸터로 보이는 짧은 줄
 _NOISE_WORDS = re.compile(
@@ -154,6 +157,11 @@ def summary_fields(text: str) -> dict[str, str]:
                 fields[line] = value
                 break
     return fields
+
+
+def summary_from_joined(line: str) -> dict[str, str]:
+    """한 줄에 붙어 오는 요약 칸을 읽는다 — 잡코리아는 화면이 아니라 meta description에만 경력·학력을 둔다."""
+    return summary_fields("\n".join(_RE_SUMMARY_JOINED.split(line)))
 
 
 def find_questions(text: str) -> list[QuestionCandidate]:

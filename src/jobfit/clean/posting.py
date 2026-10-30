@@ -14,14 +14,15 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, field
+from html import unescape as _unescape
 from pathlib import Path
 
 from jobfit.clean.html2text import html_to_text
 from jobfit.clean.keywords import KeywordDict
-from jobfit.clean.sections import Section, clean_title, drop_noise, find_questions, has_posting_body, split_sections, summary_fields
+from jobfit.clean.sections import Section, clean_title, drop_noise, find_questions, has_posting_body, split_sections, summary_fields, summary_from_joined
 from jobfit.fetch.channel import page_htmls, read_channel
 from jobfit.fetch.company import CLOSED_HINT, CLOSED_MARK, CompanyPage, read_company_page
-from jobfit.fetch.fetcher import FILE_DETAIL, FILE_MAIN, FILE_META
+from jobfit.fetch.fetcher import FILE_DETAIL, FILE_MAIN, FILE_META, PASTE_HINT
 
 FILE_POSTING = "posting.txt"
 FILE_FULL = "posting.full.txt"
@@ -59,7 +60,7 @@ def clean_job(job_dir: Path, data_dir: Path, url: str = "") -> CleanResult:
     elif (job_dir / FILE_MAIN).exists() and fetch_meta.get("ok"):
         result = _clean_fetched(job_dir, fetch_meta, data_dir)
     else:
-        return CleanResult(ok=False, source="none", error="공고 본문이 없습니다", next_hint="공고 본문 붙여넣기 (output 폴더의 posting.txt)")
+        return CleanResult(ok=False, source="none", error="공고 본문이 없습니다", next_hint=PASTE_HINT)
     if result.ok:
         full = (job_dir / FILE_FULL).read_text(encoding="utf-8", errors="replace")
         result.apply = asdict(read_channel(url or fetch_meta.get("url", ""), page_htmls(job_dir), full))
@@ -119,10 +120,11 @@ def _clean_fetched(job_dir: Path, fetch_meta: dict, data_dir: Path) -> CleanResu
     (job_dir / FILE_FULL).write_text(full_text, encoding="utf-8")
 
     result = CleanResult(ok=True, source="fetched", title=title, has_body=has_body, full_chars=len(full_text))
-    result.summary = summary_fields(main_text) or summary_fields(detail_text)
+    # 잡코리아는 요약 칸(경력·학력·급여·마감일)을 화면이 아니라 meta description에만 둔다 — 화면에서 못 읽었을 때 거기서 읽는다
+    result.summary = summary_fields(main_text) or summary_fields(detail_text) or summary_from_joined(_meta_description(main_html))
     if not result.has_body:
         result.ok = False
-        result.error, result.next_hint = _no_body(page)
+        result.error, result.next_hint = _no_body(page, fetch_meta, detail_path.exists())
         return result
 
     sections = split_sections(body_source)
@@ -140,13 +142,31 @@ def _clean_fetched(job_dir: Path, fetch_meta: dict, data_dir: Path) -> CleanResu
     return result
 
 
-def _no_body(page: CompanyPage | None) -> tuple[str, str]:
-    """본문이 없을 때 오류와 다음 할 일. 채용 솔루션 페이지면 그 이유를 적는다."""
+def _no_body(page: CompanyPage | None, fetch_meta: dict, got_detail: bool) -> tuple[str, str]:
+    """본문이 없을 때 오류와 다음 할 일.
+
+    왜 못 읽었는지는 받아 둔 것으로 가른다 — 상세 페이지를 못 받은 것(주소가 바뀜·내려감)과 받았는데 본문
+    자리가 비어 있는 것(사이트가 화면 구조를 바꿈)은 사용자가 보는 이유가 달라야 한다.
+    다음 할 일은 마감 공고 말고는 언제나 붙여넣기다 — 인터넷이 막혀 못 받은 것과는 여기서 갈린다(fetcher.py).
+    """
     if page and page.closed:
         when = f", 마감 {page.deadline}" if page.deadline else ""
         return f"{CLOSED_MARK}({page.solution}{when}) — 받은 페이지에 본문이 없습니다", CLOSED_HINT
-    why = page.no_body if page and page.no_body else "화면을 스크립트로 그리는 사이트·로그인 필요·그림 공고"
-    return f"받은 페이지에 공고 본문이 없습니다 ({why})", "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
+    return f"받은 페이지에 공고 본문이 없습니다 ({_why_no_body(page, fetch_meta, got_detail)})", PASTE_HINT
+
+
+def _why_no_body(page: CompanyPage | None, fetch_meta: dict, got_detail: bool) -> str:
+    if page and page.no_body:
+        return page.no_body
+    for note in fetch_meta.get("notes") or []:
+        m = _RE_DETAIL_STATUS.match(str(note))
+        if m:
+            return f"상세요강 페이지를 받지 못했습니다(응답 {m.group(1)})"
+        if str(note).startswith(_NOTE_DETAIL_ROBOTS):
+            return "상세요강 페이지를 robots.txt가 막아 받지 못했습니다"
+    if got_detail:
+        return "상세요강 페이지를 받았지만 본문 자리가 비어 있습니다 — 사이트 구조가 바뀌었을 수 있습니다"
+    return "화면을 스크립트로 그리는 사이트·로그인 필요·그림 공고"
 
 
 def _analyze(result: CleanResult, body_text: str, full_text: str, data_dir: Path) -> None:
@@ -194,6 +214,17 @@ def _truncate(title: str, summary: dict[str, str], sections: list[Section]) -> s
             break
         kept.pop()
     return _compose_posting(title, summary, kept)
+
+
+# fetcher.py가 fetch.json 에 남긴 상세 페이지 실패 설명
+_RE_DETAIL_STATUS = re.compile(r"^상세 페이지 응답 (\d{3})")
+_NOTE_DETAIL_ROBOTS = "상세 페이지는 robots.txt"
+_RE_META_DESC = re.compile(r"""<meta[^>]+(?:name|property)=["'](?:og:)?description["'][^>]+content=["']([^"']*)["']""", re.I)
+
+
+def _meta_description(html: str) -> str:
+    m = _RE_META_DESC.search(html)
+    return _unescape(m.group(1)) if m else ""
 
 
 _RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")

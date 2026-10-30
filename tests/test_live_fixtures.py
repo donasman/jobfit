@@ -97,6 +97,23 @@ def test_live_company_site(page: Path, tmp_path):
 
 
 @pytest.mark.parametrize("main", [p for p in PAIRS if p.stem.startswith("jobkorea")], ids=lambda p: p.stem)
+def test_live_jobkorea_summary(main: Path, tmp_path):
+    """잡코리아 요약 칸(경력·학력)은 화면 글자가 아니라 meta description 에 있다."""
+    from jobfit.clean.posting import clean_job
+    from jobfit.paths import package_data_dir
+
+    assert summary_fields(_text(main)) == {}  # 화면 글자에는 없다
+    (tmp_path / "source.html").write_bytes(main.read_bytes())
+    detail = main.with_name(main.stem + "-detail.html")
+    if detail.exists():
+        (tmp_path / "source-detail.html").write_bytes(detail.read_bytes())
+    url = f"https://www.jobkorea.co.kr/Recruit/GI_Read/{main.stem.split('-')[1]}"
+    (tmp_path / "fetch.json").write_text(json.dumps({"ok": True, "url": url, "title": ""}), encoding="utf-8")
+    fields = clean_job(tmp_path, package_data_dir(), url).summary
+    assert {"경력", "학력"} <= set(fields), fields
+
+
+@pytest.mark.parametrize("main", [p for p in PAIRS if p.stem.startswith("jobkorea")], ids=lambda p: p.stem)
 def test_live_jobkorea_questions(main: Path):
     detail = main.with_name(main.stem + "-detail.html")
     if not detail.exists():

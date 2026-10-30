@@ -77,12 +77,13 @@ class Job:
         self.steps[step] = {"done": done, "at": now(), **extra}
         self.updated_at = now()
 
-    def reset_from(self, step: str) -> None:
-        """해당 단계부터 뒤의 단계 기록을 지운다(재실행용)."""
+    def reset_from(self, step: str, keep: tuple[str, ...] = ()) -> None:
+        """해당 단계부터 뒤의 단계 기록을 지운다(재실행용). keep 에 적은 단계는 남긴다."""
         if step not in STEPS:
             return
         for s in STEPS[STEPS.index(step):]:
-            self.steps.pop(s, None)
+            if s not in keep:
+                self.steps.pop(s, None)
         self.error = ""
         self.updated_at = now()
 
@@ -112,6 +113,24 @@ class Job:
         self.updated_at = now()
 
 
+# 목록·사전이어야 하는 칸. 모양이 다르면 없는 것으로 보고 기본값을 쓴다
+_CONTAINERS = {"steps": dict, "user_questions": list, "force_steps": list}
+
+
+def load_job(key: str, raw: Any) -> "Job | None":
+    """state.json의 공고 한 덩어리 -> Job. 새 버전이 더한 칸은 버리고, 예전 버전에 없던 칸은 기본값으로 둔다."""
+    if not isinstance(raw, dict):
+        return None
+    values = {f: v for f, v in raw.items() if f in Job.__dataclass_fields__ and v is not None}
+    for name, kind in _CONTAINERS.items():
+        if name in values and not isinstance(values[name], kind):
+            del values[name]
+    values.setdefault("key", key)
+    values.setdefault("site", key.partition(":")[0])
+    values.setdefault("company", "")
+    return Job(**values)
+
+
 @dataclass
 class State:
     jobs: dict[str, Job] = field(default_factory=dict)
@@ -122,12 +141,24 @@ class State:
     # --- 입출력 ---
     @classmethod
     def load(cls, path: Path) -> "State":
+        """예전 버전이 쓴 state.json도 읽는다 — 모르는 칸은 버리고, 없거나 모양이 다른 칸은 기본값으로 본다."""
         if not path.exists():
             return cls()
         raw = json.loads(path.read_text(encoding="utf-8"))
-        known = set(Job.__dataclass_fields__)
-        jobs = {k: Job(**{f: x for f, x in v.items() if f in known}) for k, v in raw.get("jobs", {}).items()}
-        return cls(jobs=jobs, last_sync=raw.get("last_sync", ""), sheet_errors=raw.get("sheet_errors", []), version=raw.get("version", STATE_VERSION))
+        if not isinstance(raw, dict):
+            return cls()
+        jobs: dict[str, Job] = {}
+        for key, value in (raw.get("jobs") if isinstance(raw.get("jobs"), dict) else {}).items():
+            job = load_job(str(key), value)
+            if job is not None:
+                jobs[str(key)] = job
+        errors = raw.get("sheet_errors")
+        return cls(
+            jobs=jobs,
+            last_sync=str(raw.get("last_sync") or ""),
+            sheet_errors=[str(e) for e in errors] if isinstance(errors, list) else [],
+            version=raw.get("version", STATE_VERSION),
+        )
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

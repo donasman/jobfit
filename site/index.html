@@ -111,7 +111,7 @@ nav.toc a:hover { color: var(--text); text-decoration: none; }
 
 /* 절 */
 section { padding: 64px 0; border-bottom: 1px solid var(--line); }
-section:nth-of-type(even) { background: var(--bg-soft); }
+section:nth-of-type(odd) { background: var(--bg-soft); }
 h2 { font-size: clamp(24px, 3.4vw, 32px); margin: 0 0 10px; letter-spacing: -0.01em; }
 h2 + p.sub { color: var(--muted); margin: 0 0 32px; max-width: 760px; }
 h3 { font-size: 19px; margin: 0 0 8px; }
@@ -263,6 +263,7 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
       jobfit
     </a>
     <nav class="toc" aria-label="목차">
+      <a href="#privacy">내 정보</a>
       <a href="#features">기능</a>
       <a href="#how">작동 방식</a>
       <a href="#modes">두 가지 모드</a>
@@ -292,6 +293,47 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
     <p class="meta">무료 · 오픈소스(MIT) · API 키 필요 없음 · Windows · macOS · 무료 웹 채팅 또는 Claude Code · Codex</p>
   </div>
 </div>
+
+<section id="privacy">
+  <div class="wrap">
+    <h2>내 정보는 어디까지 갑니까</h2>
+    <p class="sub">낯선 도구에 이력서와 자소서를 넣는 일입니다. 그래서 무엇이 내 컴퓨터에만 남고 무엇이 AI에게 넘어가는지를 먼저 적습니다.</p>
+    <div class="grid c2">
+      <div class="card">
+        <h3>내 컴퓨터에만 있는 것</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b><code>me/</code>와 <code>sources/</code>는 내 개인 폴더</b><span>경험 카드 · 이력서 항목 · 지원서 정보 · 문체 규칙은 <code>me/</code>에, 카드를 뽑을 이력서 · 포트폴리오와 원안 자소서는 <code>sources/</code>에 있습니다. 배포 · 공유 대상이 아니고 저장소에도 들어가지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>API 키가 필요 없습니다</b><span>붙여넣기 모드는 무료 웹 채팅에 프롬프트를 직접 붙여 넣습니다. 결과인 <code>report.md</code> · <code>dashboard.xlsx</code>도 내 폴더에 그대로 남습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>에이전트도 내 자료를 읽지 않습니다</b><span>에이전트 모드에서도 <code>AGENTS.md</code>대로 <code>uv run jobfit</code> 명령만 쓰고, 프롬프트 파일만 읽고 답 파일만 씁니다. <code>me/</code> · <code>jobs.xlsx</code> · 공고 원문은 읽지 않습니다.</span></div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>가려지는 것 · 넣지 않는 것</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>공고 속 담당자 연락처</b><span>가려서 넘깁니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 자료 속 전화번호 · 이메일</b><span>자료에서 글자를 꺼낼 때 스크립트가 가립니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>신원 정보는 아예 넣지 않습니다</b><span>이름 · 연락처 · 주소 · 생년월일은 지원서 정보(<code>me/profile.yaml</code>)에도 지원서 입력표에도 넣지 않습니다. 지원서에 직접 입력하고 제출도 직접 합니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>지원서 입력표</b><span>입력표 자체는 AI에게 넘기지 않습니다.</span></div></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin:32px 0 10px">AI에게 넘어가는 것 — 단계마다 그때 필요한 조각만</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>단계</th><th>넘어가는 것</th></tr></thead>
+        <tbody>
+          <tr><td>공고 분석</td><td>공고 본문 — 담당자 연락처는 가립니다</td></tr>
+          <tr><td>자소서 초안</td><td>경험 카드 태그 목록, 문항마다 배정된 카드의 상황 · 과제 · 행동 · 결과와 facts, 문체 규칙</td></tr>
+          <tr><td>문체 분석</td><td>원안 자소서 발췌 — 합쳐서 3,500자까지</td></tr>
+          <tr><td>경험 카드 뽑기</td><td><code>sources/</code> 자료의 글자(그림 · 스캔 PDF는 그 파일 자체), 이미 있는 카드의 id · 제목</td></tr>
+          <tr><td>지원서 정보 뽑기</td><td><code>sources/</code> 자료 중 학력 · 자격증 같은 낱말이 있는 조각, 이미 있는 항목의 이름</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><b>주소 · 주민번호가 적힌 자료는 그 부분을 지운 사본을 넣으세요.</b> 전화번호와 이메일은 스크립트가 가리지만, 주소 · 주민번호 같은 다른 개인정보와 그림 · 스캔 PDF 원본은 그대로 AI에게 넘어갑니다.</div>
+  </div>
+</section>
 
 <section id="features">
   <div class="wrap">
@@ -370,11 +412,11 @@ footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
         </ul>
       </div>
       <div class="card">
-        <h3>내 정보는</h3>
+        <h3>공고를 받을 때</h3>
         <ul class="checks">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 컴퓨터에만</b><span>경험 카드 · 이력서 항목 · 문체 규칙은 <code>me/</code>, 카드를 뽑을 자료와 원안 자소서는 <code>sources/</code> 폴더에 있고, 저장소나 배포본에 들어가지 않습니다.</span></div></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>AI에는 필요한 만큼만</b><span>문항마다 고른 경험 카드 두 개의 내용과 태그 목록만 넘어갑니다. 공고 속 담당자 연락처와 내 자료 속 전화 · 이메일은 가려서 넘깁니다.</span></div></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>크롤러 없음</b><span>내가 적은 링크 한 건씩만 받고 robots.txt를 따릅니다. 사이트를 돌며 긁어 오지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>크롤러 없음</b><span>내가 적은 링크 한 건씩만 받고 robots.txt를 따릅니다. 사이트를 돌며 긁어 오지 않습니다 — 사이트 이용약관을 확인하고 개인 용도로만 쓰세요.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b><code>jobs.xlsx</code>는 공고를 추가할 때만</b><span>그때 스크립트가 한 줄을 더하고, 쓰기 전에 <code>.jobfit/backups/</code>에 백업합니다. 엑셀이 열려 있으면 쓰지 않습니다.</span></div></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg><div><b>내 정보는 어디까지 가나</b><span>무엇이 내 컴퓨터에만 남고 무엇이 AI에게 넘어가는지는 <a href="#privacy">맨 위 '내 정보는 어디까지 갑니까'</a>에 적어 두었습니다.</span></div></li>
         </ul>
       </div>
     </div>

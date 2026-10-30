@@ -25,6 +25,9 @@ HEADER = "[사용자에게 전할 것] 에이전트는 아래 줄을 요약하�
 LOOSE_STAR = "star에 facts에 없는 숫자가 있습니다"
 MAX_LISTED = 5
 HANDOFF_TIP = "메뉴 끝에 나오는 '에이전트에게 보낼 말'을 에이전트에게 붙여 넣으면 이어서 진행합니다"
+# 공고 링크 하나면 경험 카드가 없어도 report 한 장은 나온다. 그다음 무엇을 넣으면 무엇이 늘어나는지 한 줄로.
+GROWTH = "경험 카드를 넣으면 매칭 점수와 이력서 강조 포인트가, 원안 자소서까지 넣으면 자소서 초안이 나옵니다"
+FIRST_RESULT = "지금은 공고 요건 정리까지입니다. " + GROWTH
 
 
 def collect(project: Project, state: State | None = None) -> list[str]:
@@ -113,6 +116,12 @@ def collect(project: Project, state: State | None = None) -> list[str]:
                 "공고 본문을 붙여 넣어야 합니다: " + ", ".join(f"{j.company}({j.error})" for j in paste[:MAX_LISTED])
                 + (f" 외 {len(paste) - MAX_LISTED}개" if len(paste) > MAX_LISTED else "")
                 + f" — 브라우저에서 본문을 복사해 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}로 넣으세요. {HANDOFF_TIP}"
+            )
+        if not cards and not problems and any(j.step_done("report") for j in state.active_jobs()):
+            # 카드 없이 report 까지 간 사람 — 무엇을 넣으면 무엇이 늘어나는지 알려 준다(카드가 하나라도 있으면 말하지 않는다)
+            out.append(
+                f"{FIRST_RESULT} — sources/ 에 이력서·포트폴리오를 넣고 "
+                f"{menunum.at(menunum.ME, '내 자료 관리')} → 2번(경험 카드 만들기 준비)"
             )
         no_sample = [j for j in sorted(state.active_jobs(), key=lambda j: j.row) if j.status == STATUS_NEED_SAMPLES]
         if no_sample and not list_samples(project):

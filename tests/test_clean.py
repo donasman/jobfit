@@ -36,6 +36,38 @@ def test_saramin_summary_fields_two_line_layout():
     assert fields.get("마감일", "").startswith("2026.10.27")
 
 
+def test_jobkorea_summary_box_comes_from_the_meta_description(tmp_path):
+    # 잡코리아 요약 칸(경력·학력·급여·마감일)은 화면 글자에 없다 — meta description 에만 있다(실측 2026-10)
+    import json
+
+    from jobfit.clean.posting import clean_job
+    from jobfit.paths import package_data_dir
+
+    assert summary_fields(drop_noise(_text("jobkorea-sample.html"))) == {}
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    for name, src in (("source.html", "jobkorea-sample.html"), ("source-detail.html", "jobkorea-sample-detail.html")):
+        (job_dir / name).write_text((FIXTURES / src).read_text(encoding="utf-8"), encoding="utf-8")
+    url = "https://www.jobkorea.co.kr/Recruit/GI_Read/10000002"
+    (job_dir / "fetch.json").write_text(json.dumps({"ok": True, "url": url, "title": ""}), encoding="utf-8")
+    result = clean_job(job_dir, package_data_dir(), url)
+    assert result.summary == {"경력": "신입", "학력": "대졸↑", "급여": "회사내규에 따름", "마감일": "2026.11.15"}
+    # 읽은 값은 프롬프트에 들어가는 posting.txt 의 요약 줄로 간다(report.md 도 meta.json 의 같은 칸을 쓴다)
+    assert "요약: 경력 신입 · 학력 대졸↑ · 급여 회사내규에 따름 · 마감일 2026.11.15" in (job_dir / "posting.txt").read_text(encoding="utf-8")
+
+
+def test_joined_summary_line_is_split_only_before_a_key():
+    from jobfit.clean.sections import summary_from_joined
+
+    # "대학졸업(2,3년)이상" 의 쉼표에서 자르면 값이 깨진다 — 뒤에 요약 키가 오는 쉼표에서만 자른다
+    assert summary_from_joined("경력 : 신입 , 학력 : 대학졸업(2,3년)이상, 급여 : 회사내규에 따름") == {
+        "경력": "신입",
+        "학력": "대학졸업(2,3년)이상",
+        "급여": "회사내규에 따름",
+    }
+    assert summary_from_joined("회사 소개만 있는 설명문입니다") == {}
+
+
 def test_jobkorea_detail_sections_questions_and_bracket_headers():
     text = drop_noise(_text("jobkorea-sample-detail.html"))
     assert has_posting_body(text)

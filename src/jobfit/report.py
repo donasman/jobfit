@@ -17,6 +17,7 @@ from jobfit.emphasis import build_emphasis, example_note, load_resume, split_exa
 from jobfit.experiences import check_cards, example_ids, load_cards
 from jobfit.fetch.channel import ApplyChannel, page_htmls, read_channel, resolve
 from jobfit.match import cards_in_use, load_analysis, load_match
+from jobfit.notices import FIRST_RESULT
 from jobfit.paths import Project
 from jobfit.state import Job
 from jobfit.style import draft_blocker, is_draft_rules
@@ -74,7 +75,9 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     if not match:
         out.append("(매칭 전)")
     elif not match.get("cards"):
-        out.append("경험 카드가 없어 매칭하지 않았습니다. `me/experiences.yaml`에 카드를 넣고 `jobfit run`.")
+        # 카드 없이도 여기까지는 나온다 — 다음에 무엇을 넣으면 무엇이 늘어나는지 적는다
+        out.append(f"경험 카드가 없어 매칭하지 않았습니다. {FIRST_RESULT}.")
+        out.append("`sources/` 에 이력서·포트폴리오를 넣고 `jobfit exp extract` — 그다음 `jobfit run`.")
     else:
         b = match["breakdown"]
         score = match.get("score")

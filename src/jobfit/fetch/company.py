@@ -76,7 +76,7 @@ def _greeting(data: dict) -> CompanyPage | None:
         title=str(opening.get("title") or ""),
         deadline=_kst_date(opening.get("dueDate")),
         body_html=body,
-        no_body=_image_only(body),
+        no_body=_no_body_reason(GREETING, body),
     )
 
 
@@ -94,7 +94,7 @@ def _ninehire(data: dict) -> CompanyPage | None:
         deadline=_kst_date(rec.get("endAt")),
         body_html=body,
         closed=closed,
-        no_body=_image_only(body),
+        no_body=_no_body_reason(NINEHIRE, body),
     )
 
 
@@ -142,10 +142,13 @@ def _kst_date(value) -> str:
     return (dt.astimezone(KST) if dt.tzinfo else dt).date().isoformat()
 
 
-def _image_only(body_html: str) -> str:
-    """본문 칸에 글자 없이 그림만 있으면 그 이유."""
-    if not body_html:
-        return ""
+def _no_body_reason(solution: str, body_html: str) -> str:
+    """데이터의 본문 칸을 쓸 수 없는 이유. 글자가 있으면 빈 문자열.
+
+    칸이 비어 있는 것(사이트가 데이터 모양을 바꿨거나 공고가 아직 안 채워짐)과 그림 공고를 가른다.
+    """
+    if not body_html.strip():
+        return f"{solution} 공고의 본문 칸이 비어 있습니다"
     soup = BeautifulSoup(body_html, "html.parser")
     if soup.get_text(strip=True) or not soup.find("img"):
         return ""

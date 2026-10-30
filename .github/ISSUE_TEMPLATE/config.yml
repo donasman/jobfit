@@ -1,0 +1,9 @@
+# 빈 이슈를 막지 않는다 — 템플릿에 맞지 않는다고 비개발자가 포기하면 안 된다.
+blank_issues_enabled: true
+contact_links:
+  - name: 사용법 · 자주 묻는 질문
+    url: https://donasman.github.io/jobfit/#faq
+    about: 설치, 쓰는 법, 안 되는 사이트, AI 에 무엇이 넘어가는지 — 먼저 여기를 보면 바로 풀리는 것이 많습니다.
+  - name: README — 설치와 '꼭 알고 쓰기'
+    url: https://github.com/donasman/jobfit#readme
+    about: me/ 와 sources/ 에 무엇을 넣는지, 내 정보가 어디까지 나가는지.

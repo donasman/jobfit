@@ -170,3 +170,56 @@ def test_pasted_posting_is_used_when_no_url(tmp_path):
     lines = pipeline.run(project, state, job)
     assert job.step_done("fetch") and job.step_done("clean"), lines
     assert job.status != "오류"
+
+
+# --- 첫 코스: 공고 링크 하나 → report 한 장 ---
+
+
+def _fresh(tmp_path) -> Project:
+    from jobfit import cli
+
+    assert cli.main(["--root", str(tmp_path), "init"]) == 0
+    return Project(tmp_path)
+
+
+def test_next_without_jobs_leads_with_a_job_link(tmp_path):
+    # 처음 쓰는 사람의 첫 코스 — 내 자료보다 공고 링크 하나가 먼저다
+    project = _fresh(tmp_path)
+    action = pipeline.next_action(project, State())
+    assert action.command == 'jobfit add "<공고 링크>"'
+    assert "먼저 공고 링크 하나를 넣고 결과를 보세요" in action.message
+    assert "경험 카드가 없어도 공고 요건 정리(report.md)까지 나옵니다" in action.message
+    assert "경험 카드를 넣으면 매칭 점수와 이력서 강조 포인트가" in action.message
+
+
+def test_next_with_sources_but_no_jobs_still_shows_the_job_link(tmp_path):
+    # sources/ 에 자료만 넣은 사람에게도 공고 한 장 길을 알려 준다(자료 안내는 그대로)
+    project = _fresh(tmp_path)
+    (project.sources_dir / "r.txt").write_text("주문 API 개선 프로젝트", encoding="utf-8")
+    action = pipeline.next_action(project, State())
+    assert action.command == "jobfit exp extract"
+    assert pipeline.FIRST_JOB_TIP in action.message
+
+
+def test_before_the_first_report_the_job_comes_before_my_files(tmp_path, capsys):
+    from jobfit import cli
+    from jobfit.state import STATUS_AI, Job
+
+    project = _fresh(tmp_path)
+    (project.sources_dir / "r.txt").write_text("주문 API 개선 프로젝트", encoding="utf-8")
+    assert cli.main(["--root", str(tmp_path), "exp", "extract"]) == 0
+    capsys.readouterr()
+    state = State()
+    job = Job(key="saramin:1", site="saramin", company="예시랩", row=2, status=STATUS_AI)
+    job.mark("fetch")
+    job.mark("clean")
+    state.jobs[job.key] = job
+
+    # 둘 다 AI 단계 — report 한 장이 나오기 전에는 공고가 먼저
+    action = pipeline.next_action(project, state)
+    assert action.job is job and "AI 단계(analyze)" in action.message
+    # report 가 한 번 나온 뒤에는 매칭에 쓰일 경험 카드가 먼저
+    job.mark("analyze")
+    job.mark("match")
+    job.mark("report")
+    assert "경험 카드 뽑기" in pipeline.next_action(project, state).message

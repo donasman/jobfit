@@ -11,6 +11,7 @@ ME = 8  # 내 자료 (경험 카드 · 지원서 정보 · 문체)
 CHECK = 9  # jobs.xlsx 검사
 PROMPT = 10  # AI 프롬프트 복사 (웹 채팅)
 ANSWER = 11  # AI 답 붙여넣기 (웹 채팅)
+DIAG = 12  # 진단 정보 복사 (막혔을 때 이슈에 붙여넣기)
 
 
 def at(number: int, name: str) -> str:

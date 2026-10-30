@@ -144,13 +144,15 @@ def compute_stats(texts: list[str]) -> dict:
 
 
 def load_stats(me_dir: Path) -> dict | None:
+    """예전 버전이 쓴 수치 파일도 읽는다. 읽을 수 없거나 모양이 다르면 없는 것으로 보고 다시 잰다."""
     path = style_dir(me_dir) / "style_stats.json"
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+    return data if isinstance(data, dict) else None
 
 
 def stats_lines(stats: dict | None) -> list[str]:

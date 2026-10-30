@@ -1,0 +1,44 @@
+name: 질문 · 건의
+description: 쓰는 법이 궁금하거나, 이런 기능이 있으면 좋겠을 때
+title: "[질문] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 이력서·자소서 내용이나 개인정보는 붙여넣지 마세요
+
+        이슈는 **누구나 볼 수 있습니다.** 이름 · 연락처 · 주소 · 생년월일, `me/` 와 `sources/` 의 내용,
+        자소서 초안, 공고 본문, 회사명, 공고 링크는 적지 마세요. 예를 들어야 한다면 가짜로 바꿔 적어 주세요.
+
+        [사용법·자주 묻는 질문](https://donasman.github.io/jobfit/#faq)을 먼저 보면 바로 풀리는 것도 많습니다.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 어느 쪽인가요?
+      options:
+        - "질문 — 쓰는 법을 모르겠습니다"
+        - "건의 — 이런 기능이 있으면 좋겠습니다"
+        - "둘 다 아님 · 그냥 한마디"
+    validations:
+      required: true
+
+  - type: textarea
+    id: body
+    attributes:
+      label: 내용
+      description: 무엇을 하고 싶은지, 지금은 어떻게 하고 있는지 적어 주세요.
+      placeholder: |
+        예) 공고 하나에 자소서 문항이 10개인데 한 번에 넣는 방법이 있나요?
+        예) 마감이 가까운 공고를 메뉴 첫 화면에서 눈에 띄게 보여 주면 좋겠습니다.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 올리기 전에
+      options:
+        - label: 이력서·자소서 내용과 개인정보(이름·연락처·주소·생년월일), 회사명·공고 링크를 적지 않았습니다.
+          required: true

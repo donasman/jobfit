@@ -1,15 +1,20 @@
 """메뉴(start.bat·start.sh)와 문항 넣기, 에이전트에게 보낼 말 — 네트워크·클립보드 없이."""
 
 import io
+import shutil
+from pathlib import Path
 
 from rich.console import Console
 from test_draft import _original
 from test_report_dashboard import KEY, _job, _project
 
-from jobfit import cli, handoff, menu, pipeline
+from jobfit import cli, handoff, menu, notices, pipeline
+from jobfit.emphasis import load_resume
 from jobfit.excel.append import append_question_rows, lock_files
 from jobfit.excel.reader import read_jobs_workbook
+from jobfit.experiences import load_cards
 from jobfit.paths import Project
+from jobfit.profile import load_profile
 from jobfit.state import State
 
 
@@ -117,7 +122,35 @@ def test_menu_first_setup_and_quit_on_end_of_input(tmp_path):
     assert not project.jobs_xlsx.exists()
     screen = _run_menu(project, [""])  # Enter=예, 그다음 입력이 끊기면 조용히 끝낸다
     assert project.is_initialized()
-    assert "sources 폴더에 이력서·포트폴리오를 넣으세요" in screen
+    # 첫 코스는 공고 링크 하나 → 그다음 경험 카드 → 그다음 원안 자소서
+    assert "1) 공고 링크 하나를 먼저 넣고 결과를 보세요" in screen
+    first, cards, samples = (screen.index(x) for x in ("1) 공고 링크", "2) 그다음 이력서·포트폴리오", "3) 그다음 잘 쓴 자소서"))
+    assert first < cards < samples
+
+
+def _with_example(tmp_path):
+    shutil.copytree(Path(__file__).resolve().parents[1] / "me.example", tmp_path / "me.example")
+    return Project(tmp_path)
+
+
+def test_first_setup_offers_to_drop_the_example_cards(tmp_path):
+    # 실측: 예시 카드가 me/ 에 남아 진짜 카드와 섞였다 — 처음 설정에서 지우고 시작할 수 있어야 한다
+    project = _with_example(tmp_path)
+    screen = _run_menu(project, ["", ""])  # 지금 만들까요? 예 → 예시 카드를 지울까요? 예
+    assert "예시를 지우고 빈 상태로 시작합니다: experiences.yaml, resume.yaml, profile.yaml" in screen
+    assert load_cards(project.experiences_file) == ([], [])
+    assert load_resume(project.resume_file) == ([], [])
+    assert load_profile(project.profile_file) == ([], [])
+    assert project.experiences_file.read_text(encoding="utf-8").startswith("# 경험 은행")  # 쓰는 법은 남는다
+    assert notices.collect(project) == []  # 지웠으니 "예시 카드가 남아 있습니다" 경고도 없다
+
+
+def test_first_setup_keeps_the_example_cards_when_declined(tmp_path):
+    project = _with_example(tmp_path)
+    _run_menu(project, ["", "n"])
+    cards, _ = load_cards(project.experiences_file)
+    assert [c["id"] for c in cards] == [c["id"] for c in load_cards(project.me_example_dir / "experiences.yaml")[0]]
+    assert any("예시 카드" in n for n in notices.collect(project))  # 예전 폴더를 쓰는 사람을 위한 경고는 그대로
 
 
 def test_split_notices_moves_the_block_into_its_own_box():

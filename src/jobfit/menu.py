@@ -47,6 +47,9 @@ MAIN_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
         (M.PROMPT, "AI 프롬프트 복사", "클립보드로"),
         (M.ANSWER, "AI 답 붙여넣기", "저장·검사하고 이어서 진행"),
     ]),
+    ("막혔을 때", [
+        (M.DIAG, "진단 정보 복사", "이슈에 붙여넣을 정보 — 개인정보는 안 들어감"),
+    ]),
 ]
 ME_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
     ("경험 카드", [
@@ -170,6 +173,7 @@ class _Menu:
             M.CHECK: lambda: self._step(["check"], "", ""),
             M.PROMPT: lambda: self._call(["prep", "--copy"]),
             M.ANSWER: self._answer,
+            M.DIAG: lambda: self._call(["diag", "--copy"]),
         }
         action = actions.get(choice) if choice is not None else None
         if action is None:
@@ -212,12 +216,22 @@ class _Menu:
         self.console.print(Panel("이 폴더는 아직 처음 설정 전입니다. jobs.xlsx, me/, sources/, output/ 을 만듭니다.", title="처음 설정", border_style="cyan", expand=False))
         if not self._yes("지금 만들까요?"):
             return False
-        rc, _ = self._call(["init"])
+        argv = ["init"]
+        if self.project.me_example_dir.is_dir():
+            # 예시 카드가 남아 진짜 카드와 섞이면 가짜 경험이 매칭·초안에 쓰인다 — 처음에 한 번만 묻는다
+            self.console.print("[dim]me.example 의 예시 경험 카드·이력서 항목이 me/ 로 복사됩니다. 그대로 두면 가짜 경험이 매칭·초안에 쓰일 수 있습니다[/]")
+            if self._yes("예시 카드를 지우고 빈 상태로 시작할까요?"):
+                argv.append("--no-examples")
+        rc, _ = self._call(argv)
         if rc != 0:
             return False
         self._hint(
-            f"1) sources 폴더에 이력서·포트폴리오를 넣으세요 — {M.ME}번 → 1번\n"
-            f"2) 공고 링크를 넣으세요 — {M.ADD}번(공고 추가)"
+            f"1) 공고 링크 하나를 먼저 넣고 결과를 보세요 — {M.ADD}번(공고 추가).\n"
+            f"   경험 카드가 없어도 공고 요건 정리(report.md)까지 나옵니다\n"
+            f"2) 그다음 이력서·포트폴리오를 sources 에 넣으세요 — {M.ME}번 → 1번.\n"
+            f"   매칭 점수와 이력서 강조 포인트가 늘어납니다\n"
+            f"3) 그다음 잘 쓴 자소서를 sources/자소서 에 넣으세요 — {M.ME}번 → 7번.\n"
+            f"   자소서 초안이 나옵니다"
         )
         return True
 

@@ -36,9 +36,12 @@
 ## 설치
 
 1. [Releases](../../releases/latest)에서 `jobfit.zip`을 받아 원하는 곳에 푼다.
-2. `start.bat`(macOS는 `./start.sh`)을 실행하면 처음 설정을 묻는다. Enter를 누르면 `jobs.xlsx`, `me/`, `sources/`, `output/`이 생긴다.
+2. `start.bat`(macOS는 `./start.sh`)을 실행하면 처음 설정을 묻는다. Enter를 누르면 `jobs.xlsx`, `me/`, `sources/`, `output/`이 생기고, **예시 카드를 지우고 빈 상태로 시작할지** 묻는다(`jobfit init --no-examples`).
+3. **먼저 공고 링크 하나로 결과를 본다** — 메뉴 **1. 공고 추가** → **3. 공고 처리 진행** → AI 단계 한 번. 경험 카드도 원안 자소서도 없이 `report.md`(공고 요건 정리)가 나온다. 내 자료는 그다음에 채우면 된다.
 
 ## 처음 한 번: 내 정보 넣기 (`me/`)
+
+공고 하나로 결과를 한 번 본 다음에 채우면 된다. **경험 카드**를 넣으면 매칭 점수와 이력서 강조 포인트가, **원안 자소서**까지 넣으면 자소서 초안이 나온다.
 
 `me/`는 내 컴퓨터에만 있는 개인 폴더다. 배포·공유 대상이 아니다.
 
@@ -149,10 +152,13 @@ AI가 뽑은 카드는 받기 전에 스크립트가 검사한다. **facts의 �
 - AI에게 넘어가는 것: 공고 본문(담당자 연락처는 가림), 경험 카드 태그, 문항마다 배정된 카드의 STAR·facts, 문체 규칙. 문체 분석 때는 원안 자소서 발췌(합쳐서 3,500자까지). 경험 카드를 뽑을 때는 `sources/` 자료의 글자(또는 그 파일)와 이미 있는 카드의 id·제목. 지원서 정보를 뽑을 때는 `sources/` 자료 중 학력·자격증 같은 낱말이 있는 조각과 이미 있는 항목의 이름(지원서 입력표 자체는 AI에게 넘기지 않는다). 자료의 전화번호·이메일은 스크립트가 가리지만 **주소·주민번호 같은 다른 개인정보와 그림·스캔 PDF 원본은 그대로 넘어가니**, 그런 내용은 지운 사본을 넣는다.
 - `jobs.xlsx`에는 `jobfit add`를 부를 때만 스크립트가 한 줄 추가한다(엑셀이 열려 있으면 안 쓰고, 쓰기 전에 `.jobfit/backups/`에 백업). 이때 파일을 다시 저장하므로 직접 넣은 그림·차트는 빠질 수 있다.
 
+## 막혔을 때
+
+메뉴 **12. 진단 정보 복사**(`uv run jobfit diag --copy`) — 버전·OS·어디까지 진행됐는지가 클립보드에 복사된다. **이력서·자소서 내용, 이름·연락처·회사명·공고 링크는 들어가지 않는다**(개수와 있고 없음만). 그대로 [이슈](../../issues/new/choose)에 붙여 넣으면 된다.
+
 ## 알려진 한계
 
 - 원티드처럼 화면을 스크립트로 그리는 사이트, 그림·PDF 공고, `.hwp` 파일은 직접 붙여 넣어야 한다.
-- 잡코리아 요약 칸(경력·학력)은 아직 읽지 않는다(본문에는 들어 있다).
 - 공고 자동 수집(알림 메일·API), Notion API 직접 쓰기는 다음 버전.
 - 경험 카드 뽑기의 숫자 대조는 값만 본다. 숫자가 자료에 있어도 다른 맥락에서 가져왔을 수 있으니 `verified`는 직접 확인하고 바꾼다.
 
@@ -173,7 +179,7 @@ docs/SPEC.md     설계 전체
 
 ## 명령 모음
 
-`uv run jobfit <명령>` — `init` · `add` · `run` · `next` · `check` · `sync-in` · `fetch` · `clean` · `posting` · `prep` · `accept` · `match` · `report` · `dashboard` · `exp extract` · `exp check` · `exp new` · `style stats` · `export notion` · `usage`. 자세한 건 `uv run jobfit --help`와 [docs/SPEC.md §10](docs/SPEC.md).
+`uv run jobfit <명령>` — `init` · `add` · `question add` · `run` · `next` · `check` · `sync-in` · `fetch` · `clean` · `posting` · `prep` · `accept` · `match` · `report` · `dashboard` · `exp extract` · `exp check` · `exp new` · `profile extract` · `profile check` · `apply sheet` · `style stats` · `export notion` · `usage` · `diag`. 자세한 건 `uv run jobfit --help`와 [docs/SPEC.md §10](docs/SPEC.md).
 
 ## 개발
 

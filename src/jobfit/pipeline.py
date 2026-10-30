@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from jobfit import jobkey, menunum
@@ -20,6 +20,7 @@ from jobfit.excel.reader import JobRow, QuestionRow, ReadResult, read_jobs_workb
 from jobfit.experiences import file_sha
 from jobfit.fetch.fetcher import FILE_MAIN, FILE_META, NETWORK_ERROR_MARK, fetch_job
 from jobfit.match import inputs_sha, load_match, run_match
+from jobfit.notices import GROWTH
 from jobfit.paths import Project
 from jobfit.report import FILE_REPORT, write_report
 from jobfit.style import draft_blocker, refresh_stats, style_pending
@@ -43,6 +44,14 @@ AI_PREPARERS = {"analyze": analyze.prepare, "draft": draft.prepare}
 AI_HINT = f"AI 프롬프트 복사 (메뉴 {menunum.PROMPT} · jobfit prep --copy) → 웹 채팅 → 답 복사 → 메뉴 {menunum.ANSWER} (jobfit accept --paste)"
 
 PASTE_HINT = "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
+# 처음 쓰는 사람의 첫 코스 — 공고 링크 하나로 report 한 장까지. 내 자료는 그다음이다
+FIRST_JOB = (
+    f'먼저 공고 링크 하나를 넣고 결과를 보세요 — {menunum.at(menunum.ADD, "공고 추가")}, 또는 jobfit add "<링크>" 뒤 jobfit run. '
+    f"경험 카드가 없어도 공고 요건 정리(report.md)까지 나옵니다. {GROWTH}"
+)
+FIRST_JOB_TIP = (
+    f'공고 링크 하나를 넣으면 경험 카드 없이도 공고 요건 정리(report.md)가 바로 나옵니다 — {menunum.at(menunum.ADD, "공고 추가")}, 또는 jobfit add "<링크>"'
+)
 
 
 @dataclass
@@ -212,27 +221,34 @@ def refresh_dashboard(project: Project, state: State) -> str:
 
 def invalidate_stale(project: Project, job: Job) -> str:
     """매칭·report의 입력(분석·경험 카드·문항·이력서)이 바뀌었으면 그 단계부터 다시 하게 한다. 이유를 돌려준다."""
-    reason = _stale_reason(project, job)
+    reason, changed = _stale(project, job)
     if reason:
-        job.reset_from("match" if "매칭" in reason else "report")
+        # 매칭 규칙만 바뀐 것(스크립트가 좋아진 것)이면 다 쓴 초안은 남긴다 — 예전 폴더에는 rules_sha 가 없어
+        # 올릴 때마다 '바뀜'이 되는데, 초안까지 지우면 원안 자소서가 없는 사람은 그 초안을 영영 되찾지 못한다.
+        keep = ("draft",) if changed == ["rules_sha"] else ()
+        job.reset_from("match" if "매칭" in reason else "report", keep=keep)
         job.status = STATUS_RUNNING
     return reason
 
 
 def _stale_reason(project: Project, job: Job) -> str:
+    return _stale(project, job)[0]
+
+
+def _stale(project: Project, job: Job) -> tuple[str, list[str]]:
     if job.step_done("match"):
         stored = job.steps["match"]
         changed = [k for k, v in inputs_sha(project, job).items() if stored.get(k) != v]
         if changed:
             names = {"analysis_sha": "공고 분석", "cards_sha": "경험 카드", "questions_sha": "문항", "rules_sha": "매칭 규칙"}
-            return "·".join(names[k] for k in changed) + "이(가) 바뀌어 매칭부터 다시"
+            return "·".join(names[k] for k in changed) + "이(가) 바뀌어 매칭부터 다시", changed
     if job.step_done("report"):
         stored = job.steps["report"]
         if stored.get("resume_sha") != file_sha(project.resume_file):
-            return "이력서 항목이 바뀌어 report부터 다시"
+            return "이력서 항목이 바뀌어 report부터 다시", []
         if stored.get("apply_via", "") != job.apply_via:
-            return "지원방법이 바뀌어 report부터 다시"
-    return ""
+            return "지원방법이 바뀌어 report부터 다시", []
+    return "", []
 
 
 def _run_job(project: Project, job: Job) -> str:
@@ -351,14 +367,21 @@ def _load_json(path: Path) -> dict:
 def next_action(project: Project, state: State) -> Action:
     if not project.is_initialized():
         return Action(kind="run", message="처음 설정이 필요합니다", command="jobfit init")
-    # 경험 카드가 매칭에 쓰이므로, 같은 급이면 자료 → 공고 순서로 안내한다
+    # 첫 결과(report 한 장)가 나오기 전에는 공고가, 나온 뒤에는 매칭·초안에 쓰일 내 자료가 먼저다
     exp, sty, prof = _exp_action(project), _style_action(project), _profile_action(project)
     if not state.jobs:
+        # 공고가 하나도 없으면 공고 링크가 먼저다. 자료 쪽 할 일이 있으면 그 일을 안내하되 이 길을 함께 알려 준다
         mine = [a for a in (exp, sty, prof) if a]
-        return min(mine, key=lambda a: _PRIORITY[a.kind]) if mine else Action(kind="edit", message=f'jobs.xlsx 공고 시트에 공고를 적거나 jobfit add "<링크>"(메뉴 {menunum.ADD})로 추가한 뒤 jobfit run(메뉴 {menunum.RUN})', command="jobfit run")
+        if not mine:
+            return Action(kind="edit", message=FIRST_JOB, command='jobfit add "<공고 링크>"')
+        first = min(mine, key=lambda a: _PRIORITY[a.kind])
+        return replace(first, message=f"{first.message}\n  {FIRST_JOB_TIP}")
     # 경험 카드는 매칭에, 문체 분석은 초안에 쓰여 공고보다 먼저, 지원서 정보는 입력표에만 쓰여 공고 뒤에
     jobs = [a for a in (_job_action(project, j) for j in sorted(state.active_jobs(), key=lambda j: j.row)) if a]
-    actions = ([exp] if exp else []) + ([sty] if sty else []) + jobs + ([prof] if prof else [])
+    mine = ([exp] if exp else []) + ([sty] if sty else [])
+    # 다만 아직 report 한 장도 없으면 공고가 먼저다 — 첫 결과를 보기 전에 자료 AI 단계를 몇 번씩 돌지 않게
+    first_result = not any(j.step_done("report") for j in state.active_jobs())
+    actions = (jobs + mine if first_result else mine + jobs) + ([prof] if prof else [])
     if actions:
         return min(actions, key=lambda a: _PRIORITY[a.kind])  # 같은 급이면 앞의 것(자료, 그다음 jobs.xlsx 위쪽 공고)
     return Action(kind="done", message="처리할 공고가 없습니다. 새 공고를 jobs.xlsx에 적거나 결정을 미정으로 돌리세요", command="jobfit sync-in")

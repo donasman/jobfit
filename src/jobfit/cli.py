@@ -51,7 +51,8 @@ def cmd_init(project: Project, args) -> int:
         if not d.exists():
             d.mkdir(parents=True)
             made.append(project.rel(d) + "/")
-    if not project.me_dir.exists():
+    me_was_there = project.me_dir.exists()
+    if not me_was_there:
         if project.me_example_dir.is_dir():
             shutil.copytree(project.me_example_dir, project.me_dir)
             made.append("me/ (me.example 복사)")
@@ -61,10 +62,44 @@ def cmd_init(project: Project, args) -> int:
     if not project.state_file.exists():
         State().save(project.state_file)
     print("만든 것: " + (", ".join(made) if made else "없음(모두 있었음)"))
-    print("다음: 내 이력서·포트폴리오·프로젝트 문서를 sources/ 에 넣고  jobfit exp extract  (경험 카드 만들기)")
-    print(f"      원안이 될 잘 쓴 자소서는 {project.rel(project.samples_dir)}/ 에 — 초안은 그 문체·흐름에 내 경험을 맞춰 씁니다(없으면 초안을 쓰지 않습니다)")
-    print("      공고는 jobs.xlsx 공고 시트에 적고  jobfit run")
+    if getattr(args, "no_examples", False):
+        if me_was_there:
+            print("me/ 가 이미 있어 예시 지우기는 건너뜁니다 — 남은 예시는  jobfit exp check  가 알려 줍니다")
+        else:
+            cleared = _clear_examples(project)
+            print(f"예시를 지우고 빈 상태로 시작합니다: {', '.join(cleared)}" if cleared else "지울 예시가 없었습니다")
+    print('다음: 1) 공고 링크 하나로 먼저 결과를 보세요 —  jobfit add "<링크>"  뒤  jobfit run')
+    print("         경험 카드가 없어도 공고 요건 정리(output/<공고>/report.md)까지 나옵니다")
+    print("      2) 그다음 내 이력서·포트폴리오를 sources/ 에 넣고  jobfit exp extract  — 매칭 점수와 이력서 강조 포인트가 늘어납니다")
+    print(f"      3) 그다음 원안이 될 잘 쓴 자소서를 {project.rel(project.samples_dir)}/ 에 — 자소서 초안이 나옵니다(없으면 초안을 쓰지 않습니다)")
     return 0
+
+
+def _clear_examples(project: Project) -> list[str]:
+    """갓 복사한 me/ 에서 예시 항목만 비운다(쓰는 법을 적은 주석은 남긴다).
+
+    예시 카드가 남아 진짜 카드와 섞이면 가짜 경험·숫자가 매칭과 초안에 쓰인다. 처음 설정에서 고른 사람에게만 — 이미
+    쓰던 me/ 는 건드리지 않는다.
+    """
+    cleared: list[str] = []
+    for path, body in ((project.experiences_file, ""), (project.resume_file, "items: []\n"), (project.profile_file, "")):
+        if not path.exists():
+            continue
+        path.write_text(_comment_head(path.read_text(encoding="utf-8")) + body, encoding="utf-8")
+        cleared.append(path.name)
+    return cleared
+
+
+def _comment_head(text: str) -> str:
+    """파일 맨 위의 설명 주석까지만. '이 파일은 예시다' 줄은 빈 파일에 맞지 않아 뺀다."""
+    kept: list[str] = []
+    for line in text.splitlines():
+        if line.strip() and not line.lstrip().startswith("#"):
+            break
+        if line.startswith("# 이 파일은 예시다"):
+            continue
+        kept.append(line)
+    return "\n".join(kept).rstrip("\n") + "\n"
 
 
 def cmd_add(project: Project, args) -> int:
@@ -985,6 +1020,7 @@ def _require_init(project: Project) -> None:
     if not project.is_initialized():
         print(f"이 폴더에 jobs.xlsx가 없습니다. 먼저  jobfit init  을 실행하세요 ({project.root})")
         raise SystemExit(2)
+    project.samples_dir.mkdir(parents=True, exist_ok=True)  # 나중에 생긴 폴더 — 덮어쓰기 업그레이드는 init 을 돌리지 않는다
 
 
 def _utf8_stdout() -> None:
@@ -1001,7 +1037,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"jobfit {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init", help="jobs.xlsx, me/, output/ 만들기").set_defaults(func=cmd_init)
+    init = sub.add_parser("init", help="jobs.xlsx, me/, output/ 만들기")
+    init.add_argument("--no-examples", action="store_true", help="me.example 의 예시 카드·항목 없이 빈 me/ 로 시작")
+    init.set_defaults(func=cmd_init)
 
     add = sub.add_parser("add", help="jobs.xlsx 공고 시트에 한 줄 추가 (링크만 주면 회사명·직무·마감일을 페이지에서 읽음)")
     add.add_argument("url", nargs="?", default="", help="공고 링크")
@@ -1090,6 +1128,12 @@ def _build_parser() -> argparse.ArgumentParser:
     accept.set_defaults(func=cmd_accept)
 
     sub.add_parser("usage", help="공고별 프롬프트·답 길이 집계").set_defaults(func=cmd_usage)
+
+    from jobfit.diag import cmd_diag  # 진단 정보 — 이슈에 붙여넣을 한 덩어리(개인정보 없음)
+
+    diag = sub.add_parser("diag", help="진단 정보 — 막혔을 때 이슈에 붙여넣을 한 덩어리 (개수·있고 없음만)")
+    diag.add_argument("--copy", action="store_true", help="클립보드에 복사")
+    diag.set_defaults(func=cmd_diag)
 
     export = sub.add_parser("export", help="내보내기")
     export_sub = export.add_subparsers(dest="export_target", required=True)

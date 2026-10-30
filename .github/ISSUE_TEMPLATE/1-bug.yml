@@ -1,0 +1,83 @@
+name: 버그 — 하려던 대로 안 돼요
+description: 메뉴나 명령이 오류를 내거나, 결과가 이상하게 나왔을 때
+title: "[버그] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 먼저 읽어 주세요 — 이력서·자소서 내용이나 개인정보는 붙여넣지 마세요
+
+        이슈는 **누구나 볼 수 있습니다.** 아래 것들은 적지 마세요.
+
+        - 이름 · 연락처 · 주소 · 생년월일
+        - `me/` 와 `sources/` 의 내용(경험 카드 · 이력서 · 포트폴리오)
+        - 자소서 문항 · 초안 글 · 공고 본문
+        - 회사명 · 공고 링크
+
+        고치는 데 필요한 것은 아래 **진단 정보**에 다 들어 있고, 거기에는 위의 것이 하나도 들어가지 않습니다.
+        혹시 실수로 올렸다면 이슈를 지우지 말고 바로 수정한 뒤 알려 주세요 — 수정 전 내용도 남아서, 저희가 지워야 합니다.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇을 하려고 했나요?
+      placeholder: |
+        예) 공고 링크를 넣고 처리하려고 했습니다
+        예) sources 에 넣은 이력서로 경험 카드를 만들려고 했습니다
+    validations:
+      required: true
+
+  - type: textarea
+    id: happened
+    attributes:
+      label: 무엇이 나왔나요?
+      description: 화면에 나온 글을 그대로 붙여넣어 주세요. 회사명·공고 링크·내 자료 내용은 지우고요.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: 어디에서 그랬나요?
+      description: start.bat(macOS 는 ./start.sh) 메뉴 번호입니다.
+      options:
+        - "1. 공고 추가"
+        - "2. 문항 넣기"
+        - "3. 공고 처리 진행"
+        - "4. 공고 본문 붙여넣기"
+        - "5. 다음 할 일 보기"
+        - "6. 결과 폴더 열기"
+        - "7. 지원서 입력표"
+        - "8. 내 자료 관리 (경험 카드 · 지원서 정보 · 문체)"
+        - "9. jobs.xlsx 검사"
+        - "10. AI 프롬프트 복사"
+        - "11. AI 답 붙여넣기"
+        - "start.bat 을 켜는 것 자체가 안 됩니다"
+        - "처음 설치할 때"
+        - "명령을 직접 쳤습니다 (uv run jobfit …)"
+        - "에이전트에게 시켰습니다 (Claude Code · Codex · Claude 앱)"
+        - "잘 모르겠습니다"
+    validations:
+      required: true
+
+  - type: textarea
+    id: diag
+    attributes:
+      label: 진단 정보 (붙여넣는 자리)
+      description: |
+        명령 창에 `uv run jobfit diag --copy` 를 치면 진단 정보가 클립보드에 복사됩니다. 여기에 붙여넣어 주세요.
+        **개수와 있고 없음만** 들어 있습니다 — 이름 · 회사명 · 공고 링크 · 자소서 글은 들어가지 않습니다.
+        그 명령조차 안 되면 비워 두고, 위 '무엇이 나왔나요'에 그 오류를 적어 주세요.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 올리기 전에
+      options:
+        - label: 이력서·자소서 내용과 개인정보(이름·연락처·주소·생년월일), 회사명·공고 링크를 적지 않았습니다.
+          required: true
