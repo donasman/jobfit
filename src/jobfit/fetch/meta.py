@@ -1,6 +1,7 @@
 """공고 페이지에서 회사명·직무·마감일 읽기 — `jobfit add`가 링크만 받았을 때 빈칸을 채운다.
 
-순서: JSON-LD JobPosting(잡코리아 등) → 사이트별 제목 규칙(사람인·잡코리아 og:title) → 못 읽음.
+순서: JSON-LD JobPosting(잡코리아 등) → 채용 솔루션 페이지에 박힌 데이터(그리팅·나인하이어·리크루터, fetch/company.py)
+→ 사이트별 제목 규칙(사람인·잡코리아 og:title) → 못 읽음.
 읽은 값은 사용자가 준 값을 덮어쓰지 않는다. 못 읽으면 빈칸으로 둔다 — 추측하지 않는다.
 """
 
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from jobfit.clean.html2text import html_to_text
 from jobfit.clean.sections import summary_fields
 from jobfit.dates import parse_deadline
+from jobfit.fetch.company import read_company_page
 
 _ZW = re.compile(r"[​-‍⁠﻿]")  # 사람인 제목에 폭 없는 공백이 섞여 온다
 _CORP = re.compile(r"㈜|\(\s*주\s*\)|\(\s*유\s*\)|주식회사|유한회사")
@@ -31,12 +33,12 @@ class PostingMeta:
     company: str = ""
     title: str = ""
     deadline: str = ""  # YYYY-MM-DD
-    source: str = ""  # "json-ld" | "title" | ""
+    source: str = ""  # "json-ld" | "embedded" | "title" | ""
 
 
 def read_posting_meta(html: str) -> PostingMeta:
     html = _ZW.sub("", html)
-    meta = _from_json_ld(html) or _from_page_title(html) or PostingMeta()
+    meta = _from_json_ld(html) or _from_company_page(html) or _from_page_title(html) or PostingMeta()
     if not meta.deadline:
         meta.deadline = _deadline_from_summary(html)
     return meta
@@ -79,6 +81,13 @@ def _from_json_ld(html: str) -> PostingMeta | None:
             if meta.company:
                 return meta
     return None
+
+
+def _from_company_page(html: str) -> PostingMeta | None:
+    page = read_company_page(html)
+    if page is None or not (page.company or page.title):
+        return None
+    return PostingMeta(company=clean_company(page.company), title=clean_job_title(page.title), deadline=page.deadline, source="embedded")
 
 
 def _walk(data):

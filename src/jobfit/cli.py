@@ -68,6 +68,8 @@ def cmd_init(project: Project, args) -> int:
 def cmd_add(project: Project, args) -> int:
     """jobs.xlsx 공고 시트에 한 줄 추가 — 스크립트가 jobs.xlsx에 쓰는 유일한 명령."""
     _require_init(project)
+    from datetime import date
+
     from jobfit.dates import parse_deadline
     from jobfit.excel.append import ExcelBusy, append_job_row
     from jobfit.excel.reader import read_jobs_workbook
@@ -137,6 +139,8 @@ def cmd_add(project: Project, args) -> int:
     print(f"추가: 공고 시트 {row}행 — {shown}" + (f"  ({jobkey.derive(url).key})" if url else ""))
     if filled:
         print("  페이지에서 읽은 값: " + ", ".join(filled) + " — 틀리면 jobs.xlsx에서 고치세요")
+    if deadline and deadline < date.today().isoformat():
+        print(f"  마감일({deadline})이 지난 공고입니다 — 아직 지원할 수 있는지 공고에서 확인하세요")
     if apply_via and "지원방법" not in existing.job_headers:
         print("  jobs.xlsx 공고 시트에 '지원방법' 열이 없어 지원방법은 넣지 않았습니다 — 1행 빈 칸에 '지원방법'이라고 적으면 그 열을 씁니다")
     print("다음: jobfit run")

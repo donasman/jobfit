@@ -11,6 +11,7 @@ from jobfit import menunum
 from jobfit.clean.keywords import KeywordDict
 from jobfit.emphasis import example_note, load_resume, split_examples
 from jobfit.experiences import check_cards, example_ids, load_cards
+from jobfit.fetch.company import CLOSED_MARK
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
 from jobfit.match import cards_in_use, load_match
 from jobfit.paths import Project
@@ -94,7 +95,13 @@ def collect(project: Project, state: State | None = None) -> list[str]:
     if state is not None:
         failed = [j for j in sorted(state.active_jobs(), key=lambda j: j.row) if j.status == STATUS_ERROR]
         net = [j for j in failed if NETWORK_ERROR_MARK in j.error]
-        paste = [j for j in failed if j not in net]
+        closed = [j for j in failed if CLOSED_MARK in j.error]
+        paste = [j for j in failed if j not in net and j not in closed]
+        if closed:
+            out.append(
+                f"마감돼 내려간 공고가 있습니다: {_ids([j.company for j in closed])} — 지원하지 않을 공고면 jobs.xlsx 결정 열을 '지원안함'으로 바꾸세요. "
+                f"본문을 갖고 있으면 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}로 넣으면 이어서 처리합니다"
+            )
         if net:
             out.append(
                 f"공고 {len(net)}개를 이 환경에서 받지 못했습니다(인터넷 연결 문제: {_ids([j.company for j in net])}) — "

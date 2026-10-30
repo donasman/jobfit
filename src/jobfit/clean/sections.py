@@ -40,6 +40,7 @@ _BODY_GROUPS = {
     "전형절차": re.compile(r"(전형|채용)\s*(절차|과정|프로세스)|진행\s*절차"),
     "근무조건": re.compile(r"근무\s*(조건|지역|형태|시간|요일)|급여|연봉|고용\s*형태"),
 }
+_BODY_LINE_MAX = 80
 
 # 요약 칸(경력·학력·급여…). 한 줄 "경력 | 신입"·"경력: 신입" 과, 사람인처럼 키 줄 다음에 값 줄이 오는 꼴 둘 다 읽는다
 SUMMARY_KEYS = ("경력", "학력", "급여", "연봉", "근무형태", "고용형태", "근무지역", "근무지", "근무요일", "근무시간", "마감일", "접수기간", "접수마감", "직급", "직책", "모집인원", "스킬", "핵심역량", "우대조건")
@@ -81,7 +82,10 @@ class QuestionCandidate:
 
 
 def has_posting_body(text: str) -> bool:
-    found = {name for name, pat in _BODY_GROUPS.items() if pat.search(text)}
+    # 묶음은 짧은 줄(헤더·"키: 값")에서만 센다. 개인정보 동의문의 긴 문장 속 '담당업무'·'채용 과정'·'고용형태'에
+    # 속아 본문이 없는 페이지를 본문으로 본 일이 있었다(CJ 채용 실측). 80자는 실측 픽스처 18개에서 그것만 바뀌는 값
+    short = "\n".join(line for line in text.splitlines() if len(line.strip()) <= _BODY_LINE_MAX)
+    found = {name for name, pat in _BODY_GROUPS.items() if pat.search(short)}
     return len(found) >= 2 and bool(found & {"자격요건", "주요업무"})
 
 

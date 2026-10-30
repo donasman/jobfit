@@ -20,6 +20,7 @@ from jobfit.clean.html2text import html_to_text
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.sections import Section, clean_title, drop_noise, find_questions, has_posting_body, split_sections, summary_fields
 from jobfit.fetch.channel import page_htmls, read_channel
+from jobfit.fetch.company import CLOSED_HINT, CLOSED_MARK, CompanyPage, read_company_page
 from jobfit.fetch.fetcher import FILE_DETAIL, FILE_MAIN, FILE_META
 
 FILE_POSTING = "posting.txt"
@@ -97,22 +98,31 @@ def _clean_pasted(job_dir: Path, data_dir: Path) -> CleanResult:
 
 
 def _clean_fetched(job_dir: Path, fetch_meta: dict, data_dir: Path) -> CleanResult:
-    main_text = drop_noise(html_to_text((job_dir / FILE_MAIN).read_text(encoding="utf-8", errors="replace")))
+    main_html = (job_dir / FILE_MAIN).read_text(encoding="utf-8", errors="replace")
+    main_text = drop_noise(html_to_text(main_html))
     detail_path = job_dir / FILE_DETAIL
     detail_text = drop_noise(html_to_text(detail_path.read_text(encoding="utf-8", errors="replace"))) if detail_path.exists() else ""
-    title = clean_title(fetch_meta.get("title", "") or _first_line(detail_text or main_text))
+    # 채용 솔루션 페이지(그리팅·나인하이어)는 데이터의 본문 칸이 곧 공고 본문이다. 본문 판정 규칙을 거치지 않고,
+    # 사이트 메뉴·다른 공고 목록이 섞인 화면 글자 대신 그것을 쓴다
+    page = read_company_page(main_html)
+    embedded_text = drop_noise(html_to_text(page.body_html)) if page and page.body_html else ""
+    title = clean_title((page.title if page else "") or fetch_meta.get("title", "") or _first_line(detail_text or main_text))
 
-    # 본문은 상세 페이지에 있을 때 그것을, 없으면 요약 페이지를 쓴다. 요약 칸은 요약 페이지에서
-    body_source = detail_text if detail_text and has_posting_body(detail_text) else main_text
-    full_text = "\n\n".join(t for t in (main_text, detail_text) if t)
+    if embedded_text:
+        body_source = full_text = embedded_text
+        has_body = True
+    else:
+        # 본문은 상세 페이지에 있을 때 그것을, 없으면 요약 페이지를 쓴다. 요약 칸은 요약 페이지에서
+        body_source = detail_text if detail_text and has_posting_body(detail_text) else main_text
+        full_text = "\n\n".join(t for t in (main_text, detail_text) if t)
+        has_body = has_posting_body(body_source)
     (job_dir / FILE_FULL).write_text(full_text, encoding="utf-8")
 
-    result = CleanResult(ok=True, source="fetched", title=title, has_body=has_posting_body(body_source), full_chars=len(full_text))
+    result = CleanResult(ok=True, source="fetched", title=title, has_body=has_body, full_chars=len(full_text))
     result.summary = summary_fields(main_text) or summary_fields(detail_text)
     if not result.has_body:
         result.ok = False
-        result.error = "받은 페이지에 공고 본문이 없습니다 (화면을 스크립트로 그리는 사이트·로그인 필요·그림 공고)"
-        result.next_hint = "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
+        result.error, result.next_hint = _no_body(page)
         return result
 
     sections = split_sections(body_source)
@@ -128,6 +138,15 @@ def _clean_fetched(job_dir: Path, fetch_meta: dict, data_dir: Path) -> CleanResu
     result.posting_sha1 = _sha1(posting)
     _analyze(result, body_source, full_text, data_dir)
     return result
+
+
+def _no_body(page: CompanyPage | None) -> tuple[str, str]:
+    """본문이 없을 때 오류와 다음 할 일. 채용 솔루션 페이지면 그 이유를 적는다."""
+    if page and page.closed:
+        when = f", 마감 {page.deadline}" if page.deadline else ""
+        return f"{CLOSED_MARK}({page.solution}{when}) — 받은 페이지에 본문이 없습니다", CLOSED_HINT
+    why = page.no_body if page and page.no_body else "화면을 스크립트로 그리는 사이트·로그인 필요·그림 공고"
+    return f"받은 페이지에 공고 본문이 없습니다 ({why})", "공고 본문 붙여넣기 (output 폴더의 posting.txt)"
 
 
 def _analyze(result: CleanResult, body_text: str, full_text: str, data_dir: Path) -> None:

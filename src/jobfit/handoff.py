@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jobfit import menunum, pipeline
+from jobfit.fetch.company import CLOSED_MARK
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
 from jobfit.paths import Project
 from jobfit.state import STEPS, State
@@ -36,6 +37,9 @@ def build(project: Project, state: State, did: str = "") -> Handoff:
         if NETWORK_ERROR_MARK in job.error:
             return Handoff(human=f"{job.company}: 공고를 받지 못했습니다 — 인터넷 연결을 확인하고 {menunum.at(menunum.RUN, '공고 처리 진행')}을 다시 실행하세요. "
                            f"그래도 안 되면 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}")
+        if CLOSED_MARK in job.error:
+            return Handoff(human=f"{job.company}: {CLOSED_MARK} — 지원하지 않을 공고면 jobs.xlsx 결정 열을 '지원안함'으로. "
+                           f"본문을 갖고 있으면 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}")
         return Handoff(human=f"{job.company}: 공고 본문을 붙여 넣어야 합니다 — 브라우저에서 본문을 복사한 뒤 {menunum.at(menunum.POSTING, '공고 본문 붙여넣기')}")
     if action.kind == "edit":
         if job is not None:
