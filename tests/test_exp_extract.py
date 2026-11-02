@@ -231,9 +231,32 @@ def test_star_numbers_must_be_in_facts(tmp_path, capsys):
     capsys.readouterr()
     assert cli.main(["--root", str(tmp_path), "accept", "exp-extract", "--file", str(answer)]) == 0
     out = capsys.readouterr().out
-    assert "exp-batch: star에 facts에 없는 숫자가 있습니다: 3만 건" in out  # 원문에 있는데 facts에 빠짐
-    assert "star에 자료 원문에 없는 숫자가 있습니다" in out  # 70%는 원문에도 없음 — 따로 알림
-    assert "70%" not in out.split("star에 facts에 없는 숫자가 있습니다:")[1].split("\n")[0]
+    # 실측: "STAR에 facts에 없는 숫자 — facts에 넣거나 STAR에서 빼세요"를 사람에게 시켰다. 이제 스크립트가 맞춘다
+    assert 'exp-batch: star에만 있던 숫자(3만 건)를 facts에 넣었습니다 — "하루 3만 건 알림을 Spring Batch로 옮김"' in out  # 원문 문장 그대로
+    assert "exp-batch: star의 숫자(70%)는 자료 원문에 없어 [확인 필요: 70%]로 바꿨습니다" in out
+    card = load_cards(project.experiences_file)[0][-1]
+    assert card["facts"] == ["하루 3만 건 알림을 Spring Batch로 옮김"]
+    assert card["star"]["result"] == "처리 시간 [확인 필요: 70%] 단축"
+    from jobfit.experiences import loose_star_numbers
+    from jobfit.notices import collect
+
+    assert loose_star_numbers(card) == []  # 남은 일이 없다
+    assert not any("STAR" in n or "facts" in n for n in collect(project))
+
+
+def test_ground_star_edges():
+    from jobfit.ai.exp_extract import FACT_MAX, ground_star
+
+    long_line = "회사 소개와 프로젝트 배경 설명이 길게 이어지는 문단입니다 " * 3 + "그 결과 월 처리량 12만 건을 안정적으로 소화했고 " + "이후 운영 이야기가 계속 이어집니다 " * 3
+    g = ground_star({"result": "월 12만 건 처리"}, [], long_line)
+    assert len(g.facts_add) == 1 and len(g.facts_add[0]) <= FACT_MAX + 2
+    assert "12만 건" in g.facts_add[0] and g.facts_add[0].startswith("…") and g.facts_add[0].endswith("…")
+    # 원문에 없는 숫자만 표시하고, 더 긴 숫자(2023·30%)의 일부는 건드리지 않는다
+    g = ground_star({"action": "2023년에 30% 늘리고 3% 줄임"}, [], "2023년 30% 늘림")
+    assert g.star == {"action": "2023년에 30% 늘리고 [확인 필요: 3%] 줄임"}
+    # 원문이 없으면(그림·스캔) 그대로 두고, 사람이 맞다고 하면 star 문장을 facts로
+    assert ground_star({"result": "3명 팀을 이끎. 회고를 함"}, [], None) == type(g)()
+    assert ground_star({"result": "3명 팀을 이끎. 회고를 함"}, [], None, vouched=True).facts_add == ["3명 팀을 이끎."]
 
 
 def test_prompt_stays_under_limit_with_many_cards(tmp_path):
@@ -346,11 +369,12 @@ def test_user_notices_block_after_extract_next_and_run(tmp_path, capsys):
     assert cli.main(["--root", str(tmp_path), "accept", "exp-extract", "--file", str(card)]) == 0
     out = capsys.readouterr().out
     # 경고 줄 사이가 아니라, 다 끝났을 때 머리줄과 함께 한 묶음으로
-    block = out.split(HEADER, 1)[1]
+    body, block = out.split(HEADER, 1)
     assert "예시 카드 2개가 남아 있습니다(exp-order-api-latency, exp-team-onboarding-doc) — 직접 지우세요" in block
-    assert "AI가 뽑은 경험 카드 1개는 아직 확인 전입니다 — 지금 다 확인하지 않아도 됩니다" in block  # 쓰이는 공고가 아직 없다
+    # 확인 전 카드는 쓰이는 공고가 생길 때까지 할 일이 아니다 — 사람이 할 일 묶음이 아니라 본문에 한 줄
+    assert "카드는 모두 확인 전입니다 — 지금 다 확인하지 않아도 됩니다" in body and "확인해 주세요" not in block
     assert "me/resume.yaml 이 예시 그대로입니다" in block
-    assert "카드 1개의 STAR에 facts에 없는 숫자가 있습니다(exp-batch)" in block
+    assert "star에만 있던 숫자(3만 건)를 facts에 넣었습니다" in body and "STAR" not in block  # 스크립트가 맞췄다
     assert "sources/old.hwp 은(는) 읽지 못해 건너뛰었습니다" in block
     assert "자료 1개에서 카드 1개" in out
     # 에이전트가 처음 부르는 next·run 에도 같은 묶음이 붙는다

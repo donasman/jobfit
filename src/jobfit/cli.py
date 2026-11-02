@@ -303,6 +303,10 @@ def cmd_exp(project: Project, args) -> int:
         return 2
     if args.exp_command == "extract":
         return _prep_exp(project, args)
+    if args.exp_command == "show":
+        return _exp_show(project, args)
+    if args.exp_command == "verify":
+        return _exp_verify(project, args)
     path = project.experiences_file
     cards, problems = load_cards(path)
     if args.exp_command == "new":
@@ -336,7 +340,7 @@ def cmd_exp(project: Project, args) -> int:
         print(f"  {issue}")
     if unverified:
         ids = ", ".join(unverified[:5]) + (f" 외 {len(unverified) - 5}개" if len(unverified) > 5 else "")
-        print(f"  [확인 전] 카드 {len(unverified)}개 — {UNVERIFIED_NOTE}: {ids}")
+        print(f"  [확인 전] 카드 {len(unverified)}개({ids}) — {UNVERIFIED_NOTE}")
     errors = sum(1 for i in shown if i.level == "오류")
     warnings = len(shown) - errors
     summary = f"카드 {len(cards)}개 · 오류 {errors} · 경고 {warnings}" + (f" · 확인 전 {len(unverified)}" if unverified else "")
@@ -344,6 +348,64 @@ def cmd_exp(project: Project, args) -> int:
     if examples:
         print(f"예시 카드 {len(examples)}개를 지우세요: {', '.join(examples)}  ({project.rel(path)})")
     return 1 if errors else 0
+
+
+VERIFY_RULE = (
+    "에이전트: 위 카드를 사용자에게 그대로 보여 주고, 사용자가 맞다고 한 카드만  uv run jobfit exp verify <id> …  "
+    "사용자가 확인하지 않은 카드는 verify 하지 않습니다. 틀린 곳은 사용자가 me/experiences.yaml 에서 직접 고칩니다"
+)
+
+
+def _exp_show(project: Project, args) -> int:
+    from jobfit import confirm
+    from jobfit.experiences import load_cards
+
+    if args.ids:
+        cards, problems = load_cards(project.experiences_file)
+        if problems:
+            print(f"  [오류] {problems[0]}")
+            return 1
+        by_id = {str(c.get("id")): c for c in cards}
+        missing = [i for i in args.ids if i not in by_id]
+        if missing:
+            print(f"없는 카드 id 입니다: {', '.join(missing)}")
+            return 1
+        picked = [by_id[i] for i in dict.fromkeys(args.ids)]
+    else:
+        picked = confirm.to_confirm(project, everything=args.all)
+        if not picked:
+            rest = confirm.to_confirm(project, everything=True)
+            if args.all or not rest:
+                print("확인할 경험 카드가 없습니다")
+            else:
+                print(f"지금 공고에 쓰이는 카드 중 확인할 것은 없습니다 — 확인 전 카드 {len(rest)}개는 공고에 쓰일 때 알려 드립니다(지금 보려면 --all)")
+            return 0
+        print(f"확인할 경험 카드 {len(picked)}개" + ("" if args.all else " — 공고 리포트·초안에 쓰이는 카드"))
+    for card in picked:
+        print()
+        for line in confirm.show_lines(project, card):
+            print(line)
+    print()
+    print(f"맞으면: jobfit exp verify {' '.join(str(c.get('id')) for c in picked)}  (메뉴 8 → 3번이면 하나씩 Enter)")
+    print(VERIFY_RULE)
+    return 0
+
+
+def _exp_verify(project: Project, args) -> int:
+    from jobfit import confirm
+    from jobfit.experiences import card_title
+
+    result = confirm.verify(project, args.ids)
+    if not result.ok:
+        for e in result.errors:
+            print(f"  ! {e}")
+        return 1
+    for card, notes in result.done:
+        print(f"확인: 「{card_title(card)}」")
+        for note in notes:
+            print(f"  · {note}")
+    print("다음: jobfit run — 이 카드를 쓰는 공고는 매칭부터 다시 하고, 초안이 있으면 확인한 숫자로 다시 씁니다")
+    return 0
 
 
 def cmd_next(project: Project, args) -> int:
@@ -660,7 +722,7 @@ def _accept_exp(project: Project, args) -> int:
         dropped = sum(int(i.get("dropped", 0)) for i in files.values())
         done = sum(1 for i in files.values() if i.get("status") == "done")
         print(f"자료를 모두 카드로 만들었습니다 — 자료 {done}개에서 카드 {made}개" + (f", 원문에 없는 숫자라 뺀 fact {dropped}개" if dropped else ""))
-        print("다음: jobfit exp check 로 확인하고, 사실이 맞으면 verified: true 로")
+        print("카드는 모두 확인 전입니다 — 지금 다 확인하지 않아도 됩니다. 공고 리포트·초안에 쓰일 카드가 생기면 그 카드만 알려 드립니다")
         _print_notices(project, State.load(project.state_file) if project.state_file.exists() else None)
     return 0
 
@@ -1079,6 +1141,13 @@ def _build_parser() -> argparse.ArgumentParser:
     exp_new = exp_sub.add_parser("new", help="빈 카드 하나 추가")
     exp_new.add_argument("--id", help="카드 id (기본 exp-<번호>)")
     exp_new.set_defaults(func=cmd_exp)
+    exp_show = exp_sub.add_parser("show", help="확인할 카드를 읽기 좋게 (기본: 공고에 쓰이는 확인 전 카드)")
+    exp_show.add_argument("ids", nargs="*", help="카드 id (주면 그 카드만)")
+    exp_show.add_argument("--all", action="store_true", help="공고에 쓰이지 않는 확인 전 카드까지")
+    exp_show.set_defaults(func=cmd_exp)
+    exp_verify = exp_sub.add_parser("verify", help="사람이 맞다고 한 카드를 verified: true 로 (star 의 숫자는 facts 로)")
+    exp_verify.add_argument("ids", nargs="+", help="카드 id")
+    exp_verify.set_defaults(func=cmd_exp)
 
     profile = sub.add_parser("profile", help="지원서 정보 (me/profile.yaml — 학력·자격증·어학 …)")
     profile_sub = profile.add_subparsers(dest="profile_command", required=True)

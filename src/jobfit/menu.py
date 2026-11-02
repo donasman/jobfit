@@ -23,7 +23,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from jobfit import handoff, menunum, pipeline
+from jobfit import confirm, handoff, menunum, pipeline
 from jobfit.notices import HEADER
 from jobfit.paths import Project
 from jobfit.state import STATUS_ERROR, State
@@ -55,7 +55,7 @@ ME_MENU: list[tuple[str, list[tuple[int, str, str]]]] = [
     ("경험 카드", [
         (1, "sources 폴더 열기", "이력서·포트폴리오를 넣는 곳"),
         (2, "경험 카드 만들기 준비", "sources 를 읽어 AI 단계 직전까지"),
-        (3, "경험 카드 검사", ""),
+        (3, "경험 카드 확인", "공고에 쓰이는 카드를 보고 Enter — 검사도 함께"),
         (4, "빈 경험 카드 추가", ""),
     ]),
     ("지원서 정보 (학력·경력·자격증·어학 …)", [
@@ -194,7 +194,7 @@ class _Menu:
             elif choice == 2:
                 self._step(["exp", "extract"], "자료 읽는 중…", "sources 에 새 자료를 넣었어.")
             elif choice == 3:
-                self._step(["exp", "check"], "", "")
+                self._confirm_cards()
             elif choice == 4:
                 self._call(["exp", "new"])
             elif choice == 5:
@@ -211,6 +211,34 @@ class _Menu:
                 self._call(["accept", "style-rules", "--paste"])
             elif choice == 10:
                 _open(self.project.me_dir)
+
+    def _confirm_cards(self) -> None:
+        """공고에 쓰이는 확인 전 카드를 하나씩 보여 주고 Enter 면 확인(jobfit exp verify). 확인할 카드가 없으면 검사만."""
+        state = self._state()
+        cards = confirm.to_confirm(self.project, state)
+        if not cards:
+            rest = confirm.to_confirm(self.project, state, everything=True)
+            if rest and self._yes(f"지금 공고에 쓰이는 카드 중 확인할 것은 없습니다. 확인 전 카드 {len(rest)}개를 지금 볼까요?"):
+                cards = rest
+        if not cards:
+            self._step(["exp", "check"], "", "")
+            return
+        done = 0
+        for i, card in enumerate(cards, start=1):
+            body = Text("\n".join(confirm.show_lines(self.project, card)))  # 카드 글의 [확인 필요: …]를 꾸밈 표시로 읽지 않게
+            self.console.print(Panel(body, title=f"[bold]경험 카드 {i}/{len(cards)}[/]", border_style="cyan", expand=False))
+            answer = self._ask("내용이 맞습니까? [dim](Enter=맞음 · n=나중에 · q=그만)[/] › ").lower()
+            if answer in ("q", "그만"):
+                break
+            if answer in ("n", "no", "아니오", "아니", "나중에"):
+                continue
+            rc, _ = self._call(["exp", "verify", str(card.get("id"))])
+            done += rc == 0
+        if done:
+            # 확인한 카드를 쓰는 공고의 report 에서 '확인 필요'가 빠지고, 초안이 있으면 확인한 숫자로 다시 쓰게 된다
+            self._step(["run"], "매칭을 다시 하는 중…", f"경험 카드 {done}개를 확인하고 매칭을 다시 해 뒀어.")
+        else:
+            self._hint("확인한 카드가 없습니다. 틀린 곳이 있으면 10번(me 폴더 열기)으로 experiences.yaml 을 열어 고치세요")
 
     def _first_setup(self) -> bool:
         self.console.print(Panel("이 폴더는 아직 처음 설정 전입니다. jobs.xlsx, me/, sources/, output/ 을 만듭니다.", title="처음 설정", border_style="cyan", expand=False))

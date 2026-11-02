@@ -104,7 +104,7 @@ def test_report_sections(tmp_path):
     assert "주문 API 개선 \\| 캐시 ⚠" in text  # 표 안의 | 이스케이프, verified false 표시
     assert "앞세울 경험 (내 이력서 항목이 없어 경험 카드 순위로)" in text
     assert "공고에 자소서 문항이 없습니다" in text
-    assert "verified가 true가 아닙니다" in text
+    assert "경험 카드 '주문 API 개선 | 캐시'이(가) 확인 전입니다 — 메뉴 8 → 3번(경험 카드 확인)" in text
     assert "> 지원 방법 **홈페이지** · 근거: 공고 글 '접수방법 : 자유양식의 이력서를 홈페이지 접수'" in text
 
 
@@ -222,8 +222,11 @@ def test_unverified_notice_points_to_cards_in_use(tmp_path, capsys):
     capsys.readouterr()
     cli.main(["--root", str(tmp_path), "next"])
     block = capsys.readouterr().out.split(HEADER, 1)[1]
-    assert "공고 리포트·초안에 쓰이는 경험 카드 1개가 아직 확인 전입니다(api)" in block
+    # 실측: 카드 id 와 "me/experiences.yaml 에서 verified: true 로"가 불편했다 — 제목으로, 할 일은 메뉴에서 Enter
+    assert "공고에 쓰이는 경험 카드 1개를 확인해 주세요: 「주문 API 개선 | 캐시」 — 메뉴 8 → 3번(경험 카드 확인)에서 카드를 보고 Enter" in block
+    assert "에이전트에게는 '경험 카드 확인할게'" in block
     assert "나머지 3개는 쓰일 때 알려 드립니다" in block
+    assert "verified" not in block and "experiences.yaml" not in block
     text = (project.job_dir(KEY) / "report.md").read_text(encoding="utf-8")
     assert "'동아리 활동 0'은(는) verified" not in text  # 점수 0 카드는 확인 필요에도 넣지 않는다
 

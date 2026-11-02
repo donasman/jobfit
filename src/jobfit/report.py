@@ -14,7 +14,7 @@ from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import FILE_CLEAN_META, FILE_FULL, FILE_POSTING, mask_contacts
 from jobfit.drafts import load_drafts, load_lint
 from jobfit.emphasis import build_emphasis, example_note, load_resume, split_examples
-from jobfit.experiences import check_cards, example_ids, load_cards
+from jobfit.experiences import CONFIRM_HOW, check_cards, example_ids, load_cards
 from jobfit.fetch.channel import ApplyChannel, page_htmls, read_channel, resolve
 from jobfit.match import cards_in_use, load_analysis, load_match
 from jobfit.notices import FIRST_RESULT
@@ -174,7 +174,7 @@ def build_report(project: Project, job: Job, today: date | None = None) -> str:
     used = set(cards_in_use(match))
     for c in match.get("cards", []):
         if c["id"] in used and not c["verified"]:
-            notes.append(f"경험 카드 '{titles[c['id']]}'은(는) verified가 true가 아닙니다 — 사실을 확인한 뒤 true로 바꾸세요")
+            notes.append(f"경험 카드 '{titles[c['id']]}'이(가) 확인 전입니다 — {CONFIRM_HOW}(에이전트에게는 '경험 카드 확인할게')")
     if analysis.get("dropped_questions"):
         notes.append(f"AI가 낸 문항 중 공고 원문에 없는 {len(analysis['dropped_questions'])}개를 버렸습니다: " + " / ".join(_short(x) for x in analysis["dropped_questions"]))
     examples = example_ids(cards, project.me_example_dir / "experiences.yaml")

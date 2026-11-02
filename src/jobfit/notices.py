@@ -7,13 +7,11 @@
 
 from __future__ import annotations
 
-from jobfit import menunum
-from jobfit.clean.keywords import KeywordDict
+from jobfit import confirm, menunum
 from jobfit.emphasis import example_note, load_resume, split_examples
-from jobfit.experiences import check_cards, example_ids, load_cards
+from jobfit.experiences import CONFIRM_HOW, card_title, example_ids, load_cards
 from jobfit.fetch.company import CLOSED_MARK
 from jobfit.fetch.fetcher import NETWORK_ERROR_MARK
-from jobfit.match import cards_in_use, load_match
 from jobfit.paths import Project
 from jobfit.profile import example_note as profile_example_note
 from jobfit.profile import load_profile
@@ -22,7 +20,6 @@ from jobfit.state import STATUS_ERROR, STATUS_NEED_SAMPLES, State
 from jobfit.style import list_samples
 
 HEADER = "[사용자에게 전할 것] 에이전트는 아래 줄을 요약하지 말고 빠짐없이 그대로 사용자에게 전하세요 — 사람이 직접 해야 하는 일입니다"
-LOOSE_STAR = "star에 facts에 없는 숫자가 있습니다"
 MAX_LISTED = 5
 HANDOFF_TIP = "메뉴 끝에 나오는 '에이전트에게 보낼 말'을 에이전트에게 붙여 넣으면 이어서 진행합니다"
 # 공고 링크 하나면 경험 카드가 없어도 report 한 장은 나온다. 그다음 무엇을 넣으면 무엇이 늘어나는지 한 줄로.
@@ -60,34 +57,17 @@ def collect(project: Project, state: State | None = None) -> list[str]:
         out.append(prof_note)
 
     files = exp_extract.source_files(project)
-    ai_unverified = [str(c.get("id")) for c in cards if c.get("source") and c.get("verified") is not True]
-    if ai_unverified:
-        # 31개를 한꺼번에 확인하라고 하면 당장 다 해야 하는 일로 읽힌다 — 리포트·초안에 쓰이는 카드만 짚는다
-        in_use = _in_use(project, state)
-        used = [cid for cid in ai_unverified if cid in in_use]
-        rest = len(ai_unverified) - len(used)
-        if used:
-            out.append(
-                f"공고 리포트·초안에 쓰이는 경험 카드 {len(used)}개가 아직 확인 전입니다({_ids(used)}) — me/experiences.yaml 에서 "
-                "사실을 확인하고 verified: true 로 바꾸세요(확인 전 카드의 숫자는 초안에서 [확인 필요]가 됩니다)"
-                + (f". 나머지 {rest}개는 쓰일 때 알려 드립니다" if rest else "")
-            )
-        elif not in_use:
-            out.append(
-                f"AI가 뽑은 경험 카드 {len(ai_unverified)}개는 아직 확인 전입니다 — 지금 다 확인하지 않아도 됩니다. "
-                "공고 리포트·초안에 쓰일 카드가 생기면 그 카드부터 알려 드립니다"
-            )
-    direct_ids = {cid for info in files.values() if info.get("direct") for cid in info.get("cards", [])}
-    unchecked = [cid for cid in ai_unverified if cid in direct_ids]
-    if unchecked:
-        out.append(f"그림·스캔 PDF에서 뽑은 카드는 숫자를 원문과 대조하지 못했습니다({_ids(unchecked)}) — 숫자를 직접 확인하세요")
-    if cards and not problems:
-        loose = [i.card for i in check_cards(cards, KeywordDict.load(project.data_dir)) if i.message.startswith(LOOSE_STAR)]
-        if loose:
-            out.append(
-                f"카드 {len(loose)}개의 STAR에 facts에 없는 숫자가 있습니다({_ids(loose)}) — 그 숫자를 facts에 넣거나 STAR에서 빼세요"
-                "(그대로 두면 초안 검사에 걸립니다)"
-            )
+    # 사람이 할 일은 '공고에 쓰이는 카드를 보고 Enter' 하나로 — 카드 id·yaml 칸 이름·파일 고치기를 시키지 않는다.
+    # 쓰이지 않는 카드는 말하지 않는다(실측: "31개가 확인 전"이 당장 다 해야 하는 일로 읽혔다).
+    # star 의 facts 밖 숫자와 그림·스캔 카드의 숫자도 이 확인 화면에서 함께 본다 — 따로 줄을 내지 않는다.
+    todo = confirm.to_confirm(project, state)
+    if todo:
+        rest = len(confirm.to_confirm(project, state, everything=True)) - len(todo)
+        out.append(
+            f"공고에 쓰이는 경험 카드 {len(todo)}개를 확인해 주세요: {_titles(todo)} — {CONFIRM_HOW}. "
+            "에이전트에게는 '경험 카드 확인할게'라고 하면 하나씩 보여 줍니다(확인 전 카드의 숫자는 초안에서 [확인 필요]로 비워 둡니다)"
+            + (f". 나머지 {rest}개는 쓰일 때 알려 드립니다" if rest else "")
+        )
 
     for rel, info in files.items():
         if info.get("status") == "skipped":
@@ -136,15 +116,6 @@ def collect(project: Project, state: State | None = None) -> list[str]:
     return out
 
 
-def _in_use(project: Project, state: State | None) -> set[str]:
-    """진행 중인 공고의 리포트·초안에 쓰이는 카드 id. 매칭한 공고가 없으면 빈 집합."""
-    if state is None and project.state_file.exists():
-        state = State.load(project.state_file)
-    if state is None:
-        return set()
-    return {cid for job in state.active_jobs() for cid in cards_in_use(load_match(project, job))}
-
-
 def render(notices: list[str]) -> list[str]:
     if not notices:
         return []
@@ -154,3 +125,7 @@ def render(notices: list[str]) -> list[str]:
 def _ids(ids: list[str]) -> str:
     shown = ", ".join(ids[:MAX_LISTED])
     return shown + (f" 외 {len(ids) - MAX_LISTED}개" if len(ids) > MAX_LISTED else "")
+
+
+def _titles(cards: list[dict]) -> str:
+    return _ids([f"「{card_title(c)}」" for c in cards])

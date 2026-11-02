@@ -100,6 +100,71 @@ def test_unverified_cards_are_one_line(tmp_path, capsys):
     assert "카드 7개 · 오류 0 · 경고 0 · 확인 전 7" in out
 
 
+HAND_EDITED = """# 내 경험 은행
+- id: exp-a
+  title: 주문 API
+  star:
+    situation: 느렸다
+    result: |
+      p95를 1.8초에서 0.4초로
+  facts:
+    - 쿼리 21회 → 1회
+    # 아래는 나중에
+    - 캐시 적중률 80%
+
+  # 손으로 남긴 메모
+  verified: false  # 아직
+- id: exp-b
+  title: 배치
+  facts: []
+- id: exp-c
+  title: 동아리
+  facts:
+  verified:
+"""
+
+
+def test_update_cards_changes_only_the_values(tmp_path):
+    from jobfit.experiences import CardChange, update_cards
+
+    path = tmp_path / "experiences.yaml"
+    path.write_text(HAND_EDITED, encoding="utf-8")
+    update_cards(path, {
+        "exp-a": CardChange(verified=True, facts_add=("p95 1.8초 → 0.4초",)),
+        "exp-b": CardChange(verified=True, facts_add=("하루 3만 건",)),
+        "exp-c": CardChange(verified=True, facts_add=("회원 40명",)),
+    }, tmp_path / "backups")
+    text = path.read_text(encoding="utf-8")
+    # 주석·블록 글·빈 줄은 그대로, 바꾼 값만 달라진다
+    assert text.startswith("# 내 경험 은행\n") and "    # 아래는 나중에\n" in text and "  # 손으로 남긴 메모\n" in text
+    assert "    - 캐시 적중률 80%\n    - p95 1.8초 → 0.4초\n" in text  # 마지막 항목 뒤, 주석 앞
+    assert "  verified: true  # 아직\n" in text
+    assert "  facts:\n    - 하루 3만 건\n" in text and "  facts:\n    - 회원 40명\n  verified: true\n" in text
+    cards, problems = load_cards(path)
+    assert problems == []
+    assert [c["verified"] for c in cards] == [True, True, True]
+    assert cards[0]["facts"] == ["쿼리 21회 → 1회", "캐시 적중률 80%", "p95 1.8초 → 0.4초"]
+    assert cards[0]["star"]["result"] == "p95를 1.8초에서 0.4초로\n"
+    assert len(list((tmp_path / "backups").glob("experiences_*.yaml"))) == 1
+
+
+def test_update_cards_adds_missing_verified_and_refuses_odd_shapes(tmp_path):
+    from jobfit.experiences import CardChange, update_cards
+
+    path = tmp_path / "experiences.yaml"
+    path.write_text("- id: exp-a\n  title: A\n  tags: [Java]\n", encoding="utf-8")
+    update_cards(path, {"exp-a": CardChange(verified=True)}, tmp_path / "b")
+    assert path.read_text(encoding="utf-8") == "- id: exp-a\n  title: A\n  tags: [Java]\n  verified: true\n"
+    odd = "- {id: exp-a, title: A, verified: false}\n"
+    path.write_text(odd, encoding="utf-8")
+    try:
+        update_cards(path, {"exp-a": CardChange(verified=True)}, tmp_path / "b")
+        raise AssertionError("ValueError 를 기대")
+    except ValueError:
+        pass
+    assert path.read_text(encoding="utf-8") == odd  # 못 고치면 손대지 않는다
+
+
 def test_period_formats():
     ok = ("2025-03 ~ 2025-06", "2025.03", "2026 ~ 현재", "2024.09 – 2025.08", "2024-09 - 2025-08", "2025-07", "2026-08 ~ 현재")
     for period in ok:

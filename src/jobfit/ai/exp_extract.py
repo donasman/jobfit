@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,7 +24,7 @@ import yaml
 from jobfit.ai.promptfile import LIMITS, TAGS_MAX_CHARS, fit_list, load_template, log_usage, render
 from jobfit.clean.keywords import KeywordDict
 from jobfit.clean.posting import mask_contacts
-from jobfit.experiences import FILE_HEADER, card_tags, load_cards, normalize_type
+from jobfit.experiences import FILE_HEADER, backup, card_tags, load_cards, normalize_type
 from jobfit.match import ROLE_WORDS
 from jobfit.numbers import extract, same_value
 from jobfit.paths import Project
@@ -35,7 +34,6 @@ from jobfit.textio import Extracted, read_any
 STEP = "exp-extract"
 SOURCE_PART = 5000  # 프롬프트 한 장에 넣는 자료 글자수. 넘으면 조각으로 나눈다
 MAX_SOURCE_BYTES = 30_000_000  # 이보다 큰 파일(영상 등)은 읽지 않는다
-BACKUP_KEEP = 10
 DROPPED_MARK = "자료 원문에 없는 숫자가 있어 이 fact를 뺐습니다"
 _FENCE_LINE = re.compile(r"^[ \t]*```[\w-]*[ \t]*$", re.M)
 _FENCED = re.compile(r"^[ \t]*```[\w-]*[ \t]*\n(.*?)^[ \t]*```", re.S | re.M)
@@ -350,9 +348,6 @@ def normalize_cards(data: list, existing: list[dict], kd: KeywordDict, source_te
             warnings.append(f"{cid}: 문항 유형이 아니라서 뺐습니다 — {', '.join(bad)}")
         star_raw = raw.get("star") if isinstance(raw.get("star"), dict) else {}
         star = {k: str(star_raw.get(k) or "").strip() for k in ("situation", "task", "action", "result")}
-        star_nums = extract(" ".join(star.values())).numbers
-        if src_numbers is not None and any(not same_value(n, src_numbers) for n in star_nums):
-            warnings.append(f"{cid}: star에 자료 원문에 없는 숫자가 있습니다 — 고치거나 지우세요")
         facts = []
         for fact in _str_list(raw.get("facts")):
             nums = extract(fact).numbers
@@ -360,17 +355,11 @@ def normalize_cards(data: list, existing: list[dict], kd: KeywordDict, source_te
                 warnings.append(f"{cid}: {DROPPED_MARK} — \"{fact}\"")
                 continue
             facts.append(fact)
-        # star 에만 있고 facts 에 없는 숫자(원문에는 있는 것) — 초안에 쓰면 검사에 걸리니 바로 알린다
-        fact_nums = [n for f in facts for n in extract(f).numbers]
-        loose = [
-            n.raw for n in star_nums
-            if not same_value(n, fact_nums) and (src_numbers is None or same_value(n, src_numbers))
-        ]
-        if loose:
-            warnings.append(
-                f"{cid}: star에 facts에 없는 숫자가 있습니다: {', '.join(dict.fromkeys(loose))} — "
-                "그 숫자가 든 자료 문장을 facts에 넣거나 star에서 빼세요(그대로 두면 초안 검사에 걸립니다)"
-            )
+        # AI가 star 에만 쓰고 facts 에 빠뜨린 숫자 — 사람에게 고치라고 하지 않고 여기서 맞춘다
+        g = ground_star(star, facts, source_text)
+        star.update(g.star)
+        facts += g.facts_add
+        warnings += [f"{cid}: {note}" for note in g.notes]
         out.append({
             "id": cid,
             "title": title,
@@ -411,6 +400,115 @@ def append_cards(project: Project, cards: list[dict], source: str) -> Path:
         raise ValueError("카드를 덧붙인 결과가 yaml 목록으로 읽히지 않아 쓰지 않았습니다 — experiences.yaml 형식을 확인하세요")
     path.write_text(new, encoding="utf-8")
     return path
+
+
+@dataclass
+class Grounding:
+    star: dict[str, str] = field(default_factory=dict)  # 바뀐 star 칸만
+    facts_add: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+
+
+FACT_MAX = 120  # 자료 문장을 facts 로 옮길 때 이보다 길면 숫자 앞뒤만
+_SENT_SPLIT = re.compile(r"(?<=[.!?。])\s+|\n+")
+_BULLET = re.compile(r"^\s*(?:[-*•·▪◦‣]|\d{1,2}[.)])\s*")
+_CONFIRM_SPAN = re.compile(r"\[확인\s*필요[^\]]*\]")
+
+
+def ground_star(star: dict[str, str], facts: list[str], source_text: str | None, vouched: bool = False) -> Grounding:
+    """star 에만 있고 facts 에 없는 숫자를 맞춘다. 초안은 facts 의 숫자만 쓸 수 있어서, 그대로 두면 초안 검사에 걸린다.
+
+    - 자료 원문에 있는 숫자 → 그 숫자가 든 원문 문장을 facts 에 더한다
+    - 사람이 카드를 보고 맞다고 했으면(vouched) → 원문에 없어도 그 star 문장을 facts 에 더한다
+    - 원문에도 없고 확인 전이면 → star 에서 [확인 필요: 숫자]로 바꾼다(초안이 그 숫자를 쓰지 않게)
+    - 원문이 없으면(그림·스캔 자료) → 그대로 둔다. 확인할 때 facts 로 간다
+    """
+    g = Grounding()
+    fact_nums = [n for f in facts for n in extract(f).numbers]
+    src_numbers = extract(source_text).numbers if source_text else None
+    sentences = _sentences(source_text) if source_text else []
+    for key in ("situation", "task", "action", "result"):
+        value = str(star.get(key) or "")
+        for n in extract(value).numbers:
+            if same_value(n, fact_nums):
+                continue
+            fact = None
+            if src_numbers is not None and same_value(n, src_numbers):
+                fact = _source_fact(n, sentences, value)
+            if fact is None and vouched:
+                fact = _clip(next((s for s in _sentences(value) if same_value(n, extract(s).numbers)), value), n.raw)
+                fact = fact if same_value(n, extract(fact).numbers) else None
+            if fact:
+                g.facts_add.append(fact)
+                fact_nums += extract(fact).numbers
+                g.notes.append(f"star에만 있던 숫자({n.raw})를 facts에 넣었습니다 — \"{fact}\"")
+            elif src_numbers is not None and not vouched:
+                marked = _mark_unconfirmed(value, n.raw)
+                if marked != value:
+                    value = g.star[key] = marked
+                    g.notes.append(f"star의 숫자({n.raw})는 자료 원문에 없어 [확인 필요: {n.raw}]로 바꿨습니다")
+    return g
+
+
+def read_source_text(project: Project, rel: str) -> str | None:
+    """카드를 뽑은 자료의 글자(연락처는 가린 것). 그림·스캔 자료이거나 자료가 빠졌으면 None."""
+    info = _load_state(project).get("files", {}).get(rel)
+    if not info or info.get("direct") or not info.get("slug"):
+        return None
+    cache = _text_cache(project, info["slug"])
+    return cache.read_text(encoding="utf-8") if cache.exists() else None
+
+
+def _sentences(text: str) -> list[str]:
+    return [s for s in (_BULLET.sub("", part).strip() for part in _SENT_SPLIT.split(text)) if s]
+
+
+def _source_fact(n, sentences: list[str], context: str) -> str | None:
+    """n 이 든 원문 문장 중 star 문장과 가장 많이 겹치는 것."""
+    cands = [s for s in sentences if same_value(n, extract(s).numbers)]
+    if not cands:
+        return None
+    grams = _bigrams(context)
+    best = max(cands, key=lambda s: (n.raw in unicodedata.normalize("NFKC", s), len(grams & _bigrams(s))))
+    fact = _clip(best, n.raw)
+    return fact if same_value(n, extract(fact).numbers) else None
+
+
+def _bigrams(s: str) -> set[str]:
+    s = re.sub(r"\s+", "", s)
+    return {s[i:i + 2] for i in range(len(s) - 1)}
+
+
+def _clip(sentence: str, raw: str) -> str:
+    """긴 문장은 숫자 앞뒤만 — 낱말 경계에서 자르고 잘린 쪽에 …"""
+    s = sentence.strip()
+    if len(s) <= FACT_MAX:
+        return s
+    pos = s.find(raw)
+    if pos < 0:
+        s = unicodedata.normalize("NFKC", s)
+        pos = max(s.find(raw), 0)
+    half = (FACT_MAX - len(raw)) // 2
+    start, end = max(0, pos - half), min(len(s), pos + len(raw) + half)
+    if start > 0:  # 낱말 중간에서 자르지 않게 안쪽 띄어쓰기까지 — 숫자는 넘지 않는다
+        space = s.find(" ", start, pos)
+        start = space + 1 if space >= 0 else start
+    if end < len(s):
+        space = s.rfind(" ", pos + len(raw), end)
+        end = space if space >= 0 else end
+    return ("…" if start > 0 else "") + s[start:end].strip() + ("…" if end < len(s) else "")
+
+
+def _mark_unconfirmed(value: str, raw: str) -> str:
+    """value 의 raw(숫자 표기)를 [확인 필요: raw]로. 이미 [확인 필요 …] 안에 있는 것과 더 긴 숫자의 일부는 건드리지 않는다."""
+    taken = [m.span() for m in _CONFIRM_SPAN.finditer(value)]
+    out, last = [], 0
+    for m in re.finditer(rf"(?<![\d.,]){re.escape(raw)}(?!\d)", value):
+        if any(a <= m.start() < b for a, b in taken):
+            continue
+        out += [value[last:m.start()], f"[확인 필요: {raw}]"]
+        last = m.end()
+    return "".join(out) + value[last:] if out else value
 
 
 def card_yaml(card: dict) -> str:
@@ -537,16 +635,7 @@ def _str_list(value) -> list[str]:
 
 
 def _backup(path: Path, backup_dir: Path) -> None:
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dst = backup_dir / f"experiences_{stamp}.yaml"
-    n = 1
-    while dst.exists():
-        dst = backup_dir / f"experiences_{stamp}_{n}.yaml"
-        n += 1
-    shutil.copy2(path, dst)
-    for old in sorted(backup_dir.glob("experiences_*.yaml"))[:-BACKUP_KEEP]:
-        old.unlink(missing_ok=True)
+    backup(path, backup_dir)
 
 
 def limit() -> int:
