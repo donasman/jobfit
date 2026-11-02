@@ -161,6 +161,16 @@ def test_diag_reports_error_kind_not_the_message(tmp_path, fake_home):
     assert diag.error_kind("링크가 없습니다") == "링크 없음"
 
 
+def test_version_matches_pyproject():
+    # 실측: v0.4.0 을 내면서 pyproject 만 올려 --version·진단 정보가 0.3.2 로 나갔다
+    import tomllib
+
+    from jobfit import __version__
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    assert __version__ == tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+
+
 def test_diag_runs_in_an_empty_folder(tmp_path, capsys):
     """아직 아무것도 없는 폴더에서도(init 전에도) 돈다 — 막혔을 때 쓰는 명령이라서."""
     assert cli.main(["--root", str(tmp_path), "diag"]) == 0

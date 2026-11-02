@@ -3,4 +3,4 @@
 스크립트가 보장하고 AI는 판단만 한다. 자세한 설계는 docs/SPEC.md.
 """
 
-__version__ = "0.3.2"
+__version__ = "0.4.1"  # pyproject.toml 과 같아야 한다(테스트가 본다) — --version·진단 정보가 이 값을 쓴다
